@@ -1,0 +1,49 @@
+Material	<Z/A>	I [eV]	Density [g/cm3]
+A-150 Tissue-Equivalent Plastic	0.54903	65.1	1.127E+00
+Adipose Tissue (ICRU-44)	0.55579	64.8	9.500E-01
+Air, Dry (near sea level)	0.49919	85.7	1.205E-03
+Alanine	0.53876	71.9	1.424E+00
+B-100 Bone-Equivalent Plastic	0.5274	85.9	1.450E+00
+Bakelite	0.52792	72.4	1.250E+00
+Blood, Whole (ICRU-44)	0.54999	75.2	1.060E+00
+Bone, Cortical (ICRU-44)	0.51478	112	1.920E+00
+Brain, Grey/White Matter (ICRU-44)	0.55239	73.9	1.040E+00
+Breast Tissue (ICRU-44)	0.55196	70.3	1.020E+00
+C-552 Air-equivalent Plastic	0.49969	86.8	1.760E+00
+Cadmium Telluride	0.41665	539.3	6.200E+00
+Calcium Fluoride	0.48671	166	3.180E+00
+Calcium Sulfate	0.49948	152.3	2.960E+00
+15 mmol L-1 Ceric Ammonium Sulfate Solution	0.55282	76.7	1.030E+00
+Cesium Iodide	0.41569	553.1	4.510E+00
+Concrete, Ordinary	0.50932	124.5	2.300E+00
+Concrete, Barite (TYPE BA)	0.45714	248.2	3.350E+00
+Eye Lens (ICRU-44)	0.54709	74.3	1.070E+00
+Ferrous Sulfate Standard Fricke	0.55334	76.3	1.024E+00
+Gadolinium Oxysulfide	0.42265	493.3	7.440E+00
+Gafchromic Sensor	0.54384	67.2	1.300E+00
+Gallium Arsenide	0.44246	384.9	5.310E+00
+Glass, Borosilicate (Pyrex)	0.49707	134	2.230E+00
+Glass, Lead	0.42101	526.4	6.220E+00
+Lithium Fluride	0.46262	94	2.635E+00
+Lithium Tetraborate	0.48485	94.6	2.440E+00
+Lung Tissue (ICRU-44)	0.55048	75.2	1.050E+00
+Magnesium Tetroborate	0.49012	108.3	2.530E+00
+Mercuric Iodide	0.40933	684.5	6.360E+00
+Muscle, Skeletal (ICRU-44)	0.55	74.6	1.050E+00
+Ovary (ICRU-44)	0.55149	75	1.050E+00
+Photographic Emulsion (Kodak Type AA)	0.48176	179	2.200E+00
+Photographic Emulsion (Standard Nuclear)	0.45453	331	3.815E+00
+Plastic Scintillator, Vinyltoluene	0.54141	64.7	1.032E+00
+Polyethylene	0.57033	57.4	9.300E-01
+Polyethylene Terephthalate, (Mylar)	0.52037	78.7	1.380E+00
+Polymethyl Methacrylate	0.53937	74	1.190E+00
+Polystyrene	0.53768	68.7	1.060E+00
+Polytetrafluoroethylene, (Teflon)	0.47993	99.1	2.250E+00
+Polyvinyl Chloride	0.51201	108.2	1.406E+00
+Radiochromic Dye Film, Nylon Base	0.54987	64.5	1.080E+00
+Testis (ICRU-44)	0.552	74.7	1.040E+00
+Tissue, Soft (ICRU-44)	0.54996	74.7	1.060E+00
+Tissue, Soft (ICRU Four-Component)	0.54975	74.9	1.000E+00
+Tissue-Equivalent Gas, Methane Based	0.54992	61.2	1.064E-03
+Tissue-Equivalent Gas, Propane Based	0.55027	59.5	1.826E-03
+Water, Liquid	0.55508	75	1.000E+00

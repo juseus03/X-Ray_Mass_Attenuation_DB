@@ -1,0 +1,162 @@
+{
+  "build": "pyhd8ed1ab_0",
+  "build_number": 0,
+  "channel": "https://conda.anaconda.org/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "more-itertools",
+    "python >=3.7"
+  ],
+  "extracted_package_dir": "D:\\Programs\\mambaforge\\pkgs\\jaraco.classes-3.3.1-pyhd8ed1ab_0",
+  "features": "",
+  "files": [
+    "Lib/site-packages/jaraco.classes-3.3.1.dist-info/INSTALLER",
+    "Lib/site-packages/jaraco.classes-3.3.1.dist-info/LICENSE",
+    "Lib/site-packages/jaraco.classes-3.3.1.dist-info/METADATA",
+    "Lib/site-packages/jaraco.classes-3.3.1.dist-info/RECORD",
+    "Lib/site-packages/jaraco.classes-3.3.1.dist-info/REQUESTED",
+    "Lib/site-packages/jaraco.classes-3.3.1.dist-info/WHEEL",
+    "Lib/site-packages/jaraco.classes-3.3.1.dist-info/direct_url.json",
+    "Lib/site-packages/jaraco.classes-3.3.1.dist-info/top_level.txt",
+    "Lib/site-packages/jaraco/classes/__init__.py",
+    "Lib/site-packages/jaraco/classes/ancestry.py",
+    "Lib/site-packages/jaraco/classes/meta.py",
+    "Lib/site-packages/jaraco/classes/properties.py",
+    "Lib/site-packages/jaraco/classes/py.typed",
+    "Lib/site-packages/jaraco/classes/__pycache__/__init__.cpython-312.pyc",
+    "Lib/site-packages/jaraco/classes/__pycache__/ancestry.cpython-312.pyc",
+    "Lib/site-packages/jaraco/classes/__pycache__/meta.cpython-312.pyc",
+    "Lib/site-packages/jaraco/classes/__pycache__/properties.cpython-312.pyc"
+  ],
+  "fn": "jaraco.classes-3.3.1-pyhd8ed1ab_0.conda",
+  "license": "MIT",
+  "link": {
+    "source": "D:\\Programs\\mambaforge\\pkgs\\jaraco.classes-3.3.1-pyhd8ed1ab_0",
+    "type": 1
+  },
+  "md5": "c541ae264c9f1f21d83fc30dffb908ee",
+  "name": "jaraco.classes",
+  "noarch": "python",
+  "package_tarball_full_path": "D:\\Programs\\mambaforge\\pkgs\\jaraco.classes-3.3.1-pyhd8ed1ab_0.conda",
+  "package_type": "noarch_python",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "site-packages/jaraco.classes-3.3.1.dist-info/INSTALLER",
+        "path_type": "hardlink",
+        "sha256": "d0edee15f91b406f3f99726e44eb990be6e34fd0345b52b910c568e0eef6a2a8",
+        "sha256_in_prefix": "d0edee15f91b406f3f99726e44eb990be6e34fd0345b52b910c568e0eef6a2a8",
+        "size_in_bytes": 5
+      },
+      {
+        "_path": "site-packages/jaraco.classes-3.3.1.dist-info/LICENSE",
+        "path_type": "hardlink",
+        "sha256": "86da0f01aeae46348a3c3d465195dc1ceccde79f79e87769a64b8da04b2a4741",
+        "sha256_in_prefix": "86da0f01aeae46348a3c3d465195dc1ceccde79f79e87769a64b8da04b2a4741",
+        "size_in_bytes": 1023
+      },
+      {
+        "_path": "site-packages/jaraco.classes-3.3.1.dist-info/METADATA",
+        "path_type": "hardlink",
+        "sha256": "affb9e3e7fffe7402bffde8dd8423664cc3b8a9e095f4f07ac20ebe4b3475982",
+        "sha256_in_prefix": "affb9e3e7fffe7402bffde8dd8423664cc3b8a9e095f4f07ac20ebe4b3475982",
+        "size_in_bytes": 2717
+      },
+      {
+        "_path": "site-packages/jaraco.classes-3.3.1.dist-info/RECORD",
+        "path_type": "hardlink",
+        "sha256": "6f98b9f349a4596c52a472b062b2b281fa7f1c689439578b0688ad460d63ad0d",
+        "sha256_in_prefix": "6f98b9f349a4596c52a472b062b2b281fa7f1c689439578b0688ad460d63ad0d",
+        "size_in_bytes": 1345
+      },
+      {
+        "_path": "site-packages/jaraco.classes-3.3.1.dist-info/REQUESTED",
+        "path_type": "hardlink",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sha256_in_prefix": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_in_bytes": 0
+      },
+      {
+        "_path": "site-packages/jaraco.classes-3.3.1.dist-info/WHEEL",
+        "path_type": "hardlink",
+        "sha256": "a2241587fe4f9d033413780f762cf4f5608d9b08870cc6867abfde96a0777283",
+        "sha256_in_prefix": "a2241587fe4f9d033413780f762cf4f5608d9b08870cc6867abfde96a0777283",
+        "size_in_bytes": 92
+      },
+      {
+        "_path": "site-packages/jaraco.classes-3.3.1.dist-info/direct_url.json",
+        "path_type": "hardlink",
+        "sha256": "dab9be53e96b768577345bc4c0be3b0ae62a880e138d9680c603cf155039c26b",
+        "sha256_in_prefix": "dab9be53e96b768577345bc4c0be3b0ae62a880e138d9680c603cf155039c26b",
+        "size_in_bytes": 110
+      },
+      {
+        "_path": "site-packages/jaraco.classes-3.3.1.dist-info/top_level.txt",
+        "path_type": "hardlink",
+        "sha256": "d099cddcb7d71f82c845f5cbf9014e18227341664edc42f1e11d5dfe5a2ea103",
+        "sha256_in_prefix": "d099cddcb7d71f82c845f5cbf9014e18227341664edc42f1e11d5dfe5a2ea103",
+        "size_in_bytes": 7
+      },
+      {
+        "_path": "site-packages/jaraco/classes/__init__.py",
+        "path_type": "hardlink",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sha256_in_prefix": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_in_bytes": 0
+      },
+      {
+        "_path": "site-packages/jaraco/classes/ancestry.py",
+        "path_type": "hardlink",
+        "sha256": "16453b93238ef9338c830477a1b729a81f771edf9fd32c631a74f172f7c12c1d",
+        "sha256_in_prefix": "16453b93238ef9338c830477a1b729a81f771edf9fd32c631a74f172f7c12c1d",
+        "size_in_bytes": 1787
+      },
+      {
+        "_path": "site-packages/jaraco/classes/meta.py",
+        "path_type": "hardlink",
+        "sha256": "bb3d739adb1eff49fb72cd8cda17f3f2222aa1edbfdaf648fbf26216f42e0f01",
+        "sha256_in_prefix": "bb3d739adb1eff49fb72cd8cda17f3f2222aa1edbfdaf648fbf26216f42e0f01",
+        "size_in_bytes": 2198
+      },
+      {
+        "_path": "site-packages/jaraco/classes/properties.py",
+        "path_type": "hardlink",
+        "sha256": "5061eb0e71f0c087e66e8058c3cd19a83ebe62f7db0588e70d0270ba69cab773",
+        "sha256_in_prefix": "5061eb0e71f0c087e66e8058c3cd19a83ebe62f7db0588e70d0270ba69cab773",
+        "size_in_bytes": 6209
+      },
+      {
+        "_path": "site-packages/jaraco/classes/py.typed",
+        "path_type": "hardlink",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sha256_in_prefix": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_in_bytes": 0
+      },
+      {
+        "_path": "Lib/site-packages/jaraco/classes/__pycache__/__init__.cpython-312.pyc",
+        "path_type": "pyc_file"
+      },
+      {
+        "_path": "Lib/site-packages/jaraco/classes/__pycache__/ancestry.cpython-312.pyc",
+        "path_type": "pyc_file"
+      },
+      {
+        "_path": "Lib/site-packages/jaraco/classes/__pycache__/meta.cpython-312.pyc",
+        "path_type": "pyc_file"
+      },
+      {
+        "_path": "Lib/site-packages/jaraco/classes/__pycache__/properties.cpython-312.pyc",
+        "path_type": "pyc_file"
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "None",
+  "sha256": "232b40de8176fa7fb66a893653f8ae03c29616e04a83dae5a47df94b74e256ca",
+  "size": 12069,
+  "subdir": "noarch",
+  "timestamp": 1707378260000,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/conda-forge/noarch/jaraco.classes-3.3.1-pyhd8ed1ab_0.conda",
+  "version": "3.3.1"
+}
