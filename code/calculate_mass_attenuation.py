@@ -1,10 +1,13 @@
+import argparse
 import sys
+from typing import Tuple
 
 import numpy as np
 import polars as pl
+from icecream import ic
 
 
-def load_data():
+def load_data_elements() -> Tuple[pl.DataFrame, pl.DataFrame]:
     df_elements_0 = pl.scan_csv("data\\1-19.dat", separator="\t")
     df_elements_1 = pl.scan_csv("data\\20-69.dat", separator="\t")
     df_elements_2 = pl.scan_csv("data\\70-92.dat", separator="\t")
@@ -15,6 +18,16 @@ def load_data():
     df_elements_names = pl.read_csv("data\\names_elements.txt", separator="\t")
 
     return df_elements, df_elements_names
+
+
+def load_data_compounds() -> Tuple[pl.DataFrame, pl.DataFrame]:
+    df_compounds = pl.scan_csv("data\\compounds.dat", separator="\t")
+    df_compounds_names = pl.read_csv("data\\names_compounds.txt", separator="\t")
+
+    ic(df_compounds.collect())
+    ic(df_compounds_names)
+
+    return df_compounds, df_compounds_names
 
 
 def get_mass_attenuation(
@@ -34,11 +47,13 @@ def get_mass_attenuation(
     return mu
 
 
-def main():
-    df_elements, df_elements_names = load_data()
-
-    sys.stderr.write("--- Material name or Symbol: ")
-    element_name = input("")
+def get_user_input(
+    test: bool = False,
+    thickness: float = 0.1,
+    energy: float = 32,
+) -> Tuple[str, float, float]:
+    if test:
+        return thickness, energy
 
     sys.stderr.write("--- Material thickness [cm]: ")
     thickness = float(input(""))
@@ -48,20 +63,100 @@ def main():
     energy = np.round(energy, 1)
 
     if energy < 3 and energy > 200:
-        print("Error: Energy not in the database")
+        print("Error: Energy not in the database (3 keV - 200 keV)")
         exit(0)
 
-    if 0 < len(element_name) <= 2:
-        element_name = df_elements_names.filter(pl.col("Symbol") == element_name)[
-            "Element"
-        ][0]
+    return thickness, energy
 
-    mu = get_mass_attenuation(df_elements, element_name, energy)
 
+def set_arguments() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="X-Ray mass attenuation calculator for NIST elements and compounds"
+    )
+
+    parser.add_argument(
+        "material_name",
+        nargs="?",
+        help='Material name ("-" to show material list)',
+        default=None,
+    )
+
+    parser.add_argument(
+        "thickness",
+        nargs="?",
+        help="Thickness [cm] of material",
+        default=0,
+    )
+
+    parser.add_argument(
+        "energy",
+        nargs="?",
+        help="Photon energy (3 keV - 200 keV)",
+        default=None,
+    )
+
+    return parser
+
+
+def ask_for_materials(
+    df_e_names: pl.DataFrame, df_c_names: pl.DataFrame
+) -> Tuple[str, bool]:
+    sys.stderr.write("\n--- Available Materials:\n")
+    materials = []
+
+    sys.stderr.write("\n--- Elements (Symbol):\n")
+    for i, info_tuple in enumerate(df_e_names.rows()):
+        e_symbol = info_tuple[1]
+        e_name = info_tuple[2]
+        sys.stderr.write("--- {:2}: {:20} ({:2})\n".format(i, e_name, e_symbol))
+        materials.append(e_name)
+
+    sys.stderr.write("\n--- Compounds:\n")
+    carry = len(materials)
+    for i, info_tuple in enumerate(df_c_names.rows()):
+        e_name = info_tuple[0]
+        sys.stderr.write("--- {:2}: {:20}\n".format(i + carry, e_name))
+        materials.append(e_name)
+
+    is_element = False
+
+    while True:
+        sys.stderr.write("--- Enter material index or full name: ")
+        name = input("")
+        try:
+            index = int(name)
+            if not 0 <= index < len(materials):
+                sys.stderr.write("--- Invalid index!\n")
+                continue
+        except ValueError:
+            pass
+        else:
+            name = materials[index]
+            is_element = index < carry
+        return name, is_element
+
+
+def main():
+    df_elements, df_elements_names = load_data_elements()
+    df_compounds, df_compounds_names = load_data_compounds()
+
+    parser = set_arguments()
+    args = parser.parse_args()
+
+    if args.material_name is None or args.material_name == "-":
+        material_name, is_element = ask_for_materials(
+            df_elements_names, df_compounds_names
+        )
+        thickness, energy = get_user_input(test=False)
+
+    mu = (
+        get_mass_attenuation(df_elements, material_name, energy)
+        if is_element
+        else get_mass_attenuation(df_compounds, material_name, energy)
+    )
     transmission = np.round(np.exp(-1 * mu * thickness) * 100, 2)
-
     print(
-        f"For {thickness} cm of '{element_name}' the transmission of photons, with energy {energy} keV, is around {transmission} %"
+        f"For {thickness} cm of '{material_name}' the transmission of photons, with energy {energy} keV, is around {transmission} %"
     )
 
 
