@@ -4,7 +4,11 @@ from typing import Tuple
 
 import numpy as np
 import polars as pl
+
+# from icecream import ic
 from icecream import ic
+
+# ic.disable()
 
 
 def load_data_elements() -> Tuple[pl.DataFrame, pl.DataFrame]:
@@ -23,10 +27,6 @@ def load_data_elements() -> Tuple[pl.DataFrame, pl.DataFrame]:
 def load_data_compounds() -> Tuple[pl.DataFrame, pl.DataFrame]:
     df_compounds = pl.scan_csv("data\\compounds.dat", separator="\t")
     df_compounds_names = pl.read_csv("data\\names_compounds.txt", separator="\t")
-
-    ic(df_compounds.collect())
-    ic(df_compounds_names)
-
     return df_compounds, df_compounds_names
 
 
@@ -118,6 +118,7 @@ def ask_for_materials(
         sys.stderr.write("--- {:2}: {:20}\n".format(i + carry, e_name))
         materials.append(e_name)
 
+    materials = np.array(materials)
     is_element = False
 
     while True:
@@ -129,6 +130,9 @@ def ask_for_materials(
                 sys.stderr.write("--- Invalid index!\n")
                 continue
         except ValueError:
+            index = np.where(materials == name)[0]
+            if len(index) > 0:
+                is_element = index[0] < carry
             pass
         else:
             name = materials[index]
@@ -147,8 +151,24 @@ def main():
         material_name, is_element = ask_for_materials(
             df_elements_names, df_compounds_names
         )
-        thickness, energy = get_user_input(test=False)
 
+    if args.material_name is not None and len(args.material_name) <= 2:
+        try:
+            material_name = (
+                df_elements_names.filter(pl.col("Symbol") == args.material_name)
+                .select("Element")
+                .to_series()
+            )[0]
+            ic(material_name)
+            is_element = True
+        except IndexError:
+            print(f"Symbol {args.material_name} not in the data base")
+            exit(0)
+    else:
+        material_name = args.material_name
+
+    ic(is_element)
+    thickness, energy = get_user_input(test=False)
     mu = (
         get_mass_attenuation(df_elements, material_name, energy)
         if is_element
