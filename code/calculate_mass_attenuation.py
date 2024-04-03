@@ -8,7 +8,7 @@ import polars as pl
 # from icecream import ic
 from icecream import ic
 
-# ic.disable()
+ic.disable()
 
 
 def load_data_elements() -> Tuple[pl.DataFrame, pl.DataFrame]:
@@ -32,7 +32,7 @@ def load_data_compounds() -> Tuple[pl.DataFrame, pl.DataFrame]:
 
 def get_mass_attenuation(
     df_elements: pl.DataFrame, element_name: str, energy: float
-) -> float:
+) -> Tuple[float, bool]:
     try:
         mu = (
             df_elements.select(pl.col("Energy"), pl.col(element_name))
@@ -41,10 +41,9 @@ def get_mass_attenuation(
         )[element_name][0]
 
     except pl.exceptions.ColumnNotFoundError:
-        print(f"Error: '{element_name}' column not in data")
-        exit(0)
+        return None, False
 
-    return mu
+    return mu, True
 
 
 def get_user_input(
@@ -62,7 +61,7 @@ def get_user_input(
     energy = float(input(""))
     energy = np.round(energy, 1)
 
-    if energy < 3 and energy > 200:
+    if energy < 3 or energy > 200:
         print("Error: Energy not in the database (3 keV - 200 keV)")
         exit(0)
 
@@ -98,9 +97,7 @@ def set_arguments() -> argparse.ArgumentParser:
     return parser
 
 
-def ask_for_materials(
-    df_e_names: pl.DataFrame, df_c_names: pl.DataFrame
-) -> Tuple[str, bool]:
+def ask_for_materials(df_e_names: pl.DataFrame, df_c_names: pl.DataFrame) -> str:
     sys.stderr.write("\n--- Available Materials:\n")
     materials = []
 
@@ -119,7 +116,6 @@ def ask_for_materials(
         materials.append(e_name)
 
     materials = np.array(materials)
-    is_element = False
 
     while True:
         sys.stderr.write("--- Enter material index or full name: ")
@@ -130,14 +126,10 @@ def ask_for_materials(
                 sys.stderr.write("--- Invalid index!\n")
                 continue
         except ValueError:
-            index = np.where(materials == name)[0]
-            if len(index) > 0:
-                is_element = index[0] < carry
             pass
         else:
             name = materials[index]
-            is_element = index < carry
-        return name, is_element
+        return name
 
 
 def main():
@@ -148,11 +140,9 @@ def main():
     args = parser.parse_args()
 
     if args.material_name is None or args.material_name == "-":
-        material_name, is_element = ask_for_materials(
-            df_elements_names, df_compounds_names
-        )
+        material_name = ask_for_materials(df_elements_names, df_compounds_names)
 
-    if args.material_name is not None and len(args.material_name) <= 2:
+    elif args.material_name is not None and len(args.material_name) <= 2:
         try:
             material_name = (
                 df_elements_names.filter(pl.col("Symbol") == args.material_name)
@@ -160,20 +150,22 @@ def main():
                 .to_series()
             )[0]
             ic(material_name)
-            is_element = True
         except IndexError:
             print(f"Symbol {args.material_name} not in the data base")
             exit(0)
     else:
         material_name = args.material_name
 
-    ic(is_element)
     thickness, energy = get_user_input(test=False)
-    mu = (
-        get_mass_attenuation(df_elements, material_name, energy)
-        if is_element
-        else get_mass_attenuation(df_compounds, material_name, energy)
-    )
+    ic(material_name)
+    mu, is_in_db = get_mass_attenuation(df_elements, material_name, energy)
+    if not is_in_db:
+        mu, is_in_db = get_mass_attenuation(df_compounds, material_name, energy)
+
+    if not is_in_db:
+        print(f"Warning: '{material_name}' column not in data")
+        exit(0)
+
     transmission = np.round(np.exp(-1 * mu * thickness) * 100, 2)
     print(
         f"For {thickness} cm of '{material_name}' the transmission of photons, with energy {energy} keV, is around {transmission} %"
