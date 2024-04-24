@@ -4,29 +4,31 @@ from typing import Tuple
 
 import numpy as np
 import polars as pl
-
+import os
 # from icecream import ic
 from icecream import ic
 
 ic.disable()
 
+WORK_PATH = os.path.dirname(__file__)
 
 def load_data_elements() -> Tuple[pl.DataFrame, pl.DataFrame]:
-    df_elements_0 = pl.scan_csv("data\\1-19.dat", separator="\t")
-    df_elements_1 = pl.scan_csv("data\\20-69.dat", separator="\t")
-    df_elements_2 = pl.scan_csv("data\\70-92.dat", separator="\t")
+    
+    df_elements_0 = pl.scan_csv(os.path.join(WORK_PATH[:-4], "data\\1-19.dat"), separator="\t")
+    df_elements_1 = pl.scan_csv(os.path.join(WORK_PATH[:-4],"data\\20-69.dat"), separator="\t")
+    df_elements_2 = pl.scan_csv(os.path.join(WORK_PATH[:-4],"data\\70-92.dat"), separator="\t")
 
     df_elements = df_elements_0.join(df_elements_1, on="Energy", how="left")
     df_elements = df_elements.join(df_elements_2, on="Energy", how="left")
 
-    df_elements_names = pl.read_csv("data\\names_elements.txt", separator="\t")
+    df_elements_names = pl.read_csv(os.path.join(WORK_PATH[:-4],"data\\names_elements.txt"), separator="\t")
 
     return df_elements, df_elements_names
 
 
 def load_data_compounds() -> Tuple[pl.DataFrame, pl.DataFrame]:
-    df_compounds = pl.scan_csv("data\\compounds.dat", separator="\t")
-    df_compounds_names = pl.read_csv("data\\names_compounds.txt", separator="\t")
+    df_compounds = pl.scan_csv(os.path.join(WORK_PATH[:-4],"data\\compounds.dat"), separator="\t")
+    df_compounds_names = pl.read_csv(os.path.join(WORK_PATH[:-4],"data\\names_compounds.txt"), separator="\t")
     return df_compounds, df_compounds_names
 
 
@@ -133,11 +135,12 @@ def ask_for_materials(df_e_names: pl.DataFrame, df_c_names: pl.DataFrame) -> str
 
 
 def main():
-    df_elements, df_elements_names = load_data_elements()
-    df_compounds, df_compounds_names = load_data_compounds()
 
     parser = set_arguments()
     args = parser.parse_args()
+
+    df_elements, df_elements_names = load_data_elements()
+    df_compounds, df_compounds_names = load_data_compounds()
 
     if args.material_name is None or args.material_name == "-":
         material_name = ask_for_materials(df_elements_names, df_compounds_names)
