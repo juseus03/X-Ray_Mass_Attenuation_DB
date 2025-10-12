@@ -1,0 +1,17 @@
+{
+  "name": "Xray filters app",
+  "postCreateCommand": "pip install -r requirements.txt",
+  "forwardPorts": [8501],
+  "customizations": {
+    "codespaces": {
+      "openFiles": ["code/app.py"]
+    },
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "terminal.integrated.cwd": "${workspaceFolder}"
+      }
+    }
+  },
+  "postAttachCommand": "echo 'Run: streamlit run code/app.py'"
+}

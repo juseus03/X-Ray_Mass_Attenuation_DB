@@ -1,12 +1,9 @@
-from typing import List, Tuple
+from typing import Tuple
 import numpy as np
-import matplotlib.pyplot as plt
 import polars as pl
 from icecream import ic
 
 ic.disable()
-
-plt.style.use("code/presentation.mplstyle")
 
 
 class Simulation:
@@ -107,28 +104,3 @@ class Simulation:
         energy = df.select("Energy[keV]").to_numpy().reshape(-1)
         intensity = df.select("Transmitted").to_numpy().reshape(-1)
         return energy, intensity
-
-
-# thickness = 0.1  # cm
-# material = "Aluminum"
-# spectrum = "95"
-# sim = Simulation()
-# s_spectrum = sim.get_spectrum(spectrum)
-# energy = s_spectrum["Energy[keV]"].to_numpy().reshape(-1)
-# intensity = s_spectrum[spectrum].to_numpy().reshape(-1)
-
-# energy2, intensity2 = sim.calculate_transmited_spectrum(
-#     spectrum, material, thickness, True
-# )
-
-# _, ax = plt.subplots(1)
-# ax.plot(energy, intensity, label="Open Beam")
-# ax.plot(energy2, intensity2, "k--", label=f"{material} ({thickness} cm)")
-
-# ax.set_xlabel("Energy [keV]")
-# ax.set_ylabel("Counts")
-# ax.set_yscale("log")
-# # ax.set_xlim((0, 100))
-# ax.set_ylim((1e-13, 1e-5))
-# plt.legend()
-# plt.show()
