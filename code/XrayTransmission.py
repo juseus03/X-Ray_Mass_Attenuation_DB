@@ -3,7 +3,14 @@ import numpy as np
 import polars as pl
 from icecream import ic
 
-ic.disable()
+# ic.disable()
+
+
+class Filter:
+    def __init__(self, pname: str, pthickness: float, p_is_element: bool) -> None:
+        self.name = pname
+        self.thickness = pthickness
+        self.is_element = p_is_element
 
 
 class Simulation:
@@ -19,6 +26,10 @@ class Simulation:
         self.fname_info_elements = "./data/names_elements.txt"
 
         self.load_data_bases()
+
+        self.spectrum_list = []
+        self.base_spectrum_energy = ""
+        self.filter_list = []
 
     def load_data_bases(self):
         """Loads the data bases"""
@@ -42,7 +53,7 @@ class Simulation:
         self.info_elements = pl.read_csv(self.fname_info_elements, separator="\t")
         self.info_compounds = pl.read_csv(self.fname_info_compounds, separator="\t")
 
-    def get_spectrum(self, max_energy: str) -> pl.DataFrame:
+    def set_base_spectrum(self, max_energy: str):
         """Returns a tuple with the given energy spectrum
 
         Args:
@@ -51,7 +62,20 @@ class Simulation:
         Returns:
             List[np.ndarray, np.ndarray]: Energy values of the spectrum, intensity of the spectrum
         """
-        return self.spectra_db.select(pl.col("Energy[keV]"), pl.col(max_energy))
+
+        if len(self.spectrum_list) > 0:
+            self.spectrum_list = []
+
+        self.spectrum_list.append(
+            self.spectra_db.select(pl.col("Energy[keV]"), pl.col(max_energy))
+        )
+        self.base_spectrum_energy = max_energy
+
+    def get_base_spectrum(self):
+        return self.spectrum_list[0]
+
+    def get_current_spectrum(self):
+        return self.spectrum_list[-1]
 
     def get_mass_attenuation(
         self, material_name: str, is_element: bool
@@ -69,16 +93,10 @@ class Simulation:
             return self.mu_elements.select(pl.col("Energy"), pl.col(material_name))
         return self.mu_compounds.select(pl.col("Energy"), pl.col(material_name))
 
-    def calculate_transmited_spectrum(
-        self,
-        spectrum_energy: str,
-        material_name: str,
-        material_thickness: float,
-        is_element: bool,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def calculate_transmited_spectrum(self, filter: Filter) -> None:
 
-        spectrum = self.get_spectrum(spectrum_energy)
-        mu = self.get_mass_attenuation(material_name, is_element)
+        spectrum = self.spectrum_list[-1]
+        mu = self.get_mass_attenuation(filter.name, filter.is_element)
 
         emax = mu.select("Energy").max().item()
         # Filter values so both spectrum can coexist
@@ -88,19 +106,52 @@ class Simulation:
             )
 
         df = spectrum.join(mu, left_on="Energy[keV]", right_on="Energy", validate="1:1")
-        ic(df)
-        df = df.with_columns(
-            (
-                pl.col(spectrum_energy)
-                * np.exp(-1 * pl.col(material_name) * material_thickness)
-            ).alias("Transmitted")
-        ).with_columns(
-            pl.when(pl.col("Transmitted") < 1e-35)
-            .then(0)
-            .otherwise(pl.col("Transmitted"))
-            .alias("Transmitted")
+        df = (
+            df.with_columns(
+                (
+                    pl.col(self.base_spectrum_energy)
+                    * np.exp(-1 * pl.col(filter.name) * filter.thickness)
+                ).alias(self.base_spectrum_energy)
+            )
+            .with_columns(
+                pl.when(pl.col(self.base_spectrum_energy) < 1e-35)
+                .then(0)
+                .otherwise(pl.col(self.base_spectrum_energy))
+                .alias(self.base_spectrum_energy)
+            )
+            .drop(filter.name)
         )
         ic(df)
-        energy = df.select("Energy[keV]").to_numpy().reshape(-1)
-        intensity = df.select("Transmitted").to_numpy().reshape(-1)
-        return energy, intensity
+        self.spectrum_list.append(df)
+
+    def add_filter(
+        self,
+        material_name: str,
+        material_thickness: float,
+        is_element: bool,
+        index: int = -1,
+    ):
+        if index >= len(self.filter_list) or len(self.filter_list) == 0:
+            self.filter_list.append(
+                Filter(material_name, material_thickness, is_element)
+            )
+            self.calculate_transmited_spectrum(self.filter_list[-1])
+            return
+
+        self.filter_list[index] = Filter(material_name, material_thickness, is_element)
+        for i in range(index, len(self.filter_list)):
+            self.calculate_transmited_spectrum(self.filter_list[i])
+
+    def remove_filter(self, filter_indx: int):
+
+        self.spectrum_list.pop(filter_indx + 1)
+        self.filter_list.pop(filter_indx)
+        for f in self.filter_list:
+            self.calculate_transmited_spectrum(f)
+
+
+# sim = Simulation()
+# sim.set_base_spectrum("95")
+# ic(sim.get_base_spectrum())
+# sim.add_filter("Aluminum", 0.8, True)
+# sim.add_filter("Carbon", 0.1, True)
