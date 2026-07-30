@@ -148,10 +148,3 @@ class Simulation:
         self.filter_list.pop(filter_indx)
         for f in self.filter_list:
             self.calculate_transmited_spectrum(f)
-
-
-# sim = Simulation()
-# sim.set_base_spectrum("95")
-# ic(sim.get_base_spectrum())
-# sim.add_filter("Aluminum", 0.8, True)
-# sim.add_filter("Carbon", 0.1, True)

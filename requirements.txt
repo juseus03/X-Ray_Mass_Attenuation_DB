@@ -1,7 +1,0 @@
-streamlit
-polars
-plotly
-numpy
-matplotlib
-icecream
-pillow>=12.3.0
