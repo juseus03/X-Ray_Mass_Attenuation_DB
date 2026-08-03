@@ -322,7 +322,12 @@ def _get_single_material_name(cli: CLI, material_name: str) -> tuple[str, bool] 
 
 
 def run_single_value(cli: CLI, args) -> None:
+    """Single value calculation for transmission
 
+    Args:
+        cli (CLI): CLI object
+        args (_type_): cmd line arguments object
+    """
     # Get material name
     if (
         args.material_name is None
