@@ -12,7 +12,7 @@ Muscle, Skeletal (ICRU-44)	0.55	74.6	1.050E+00
 Polyethylene Terephthalate, (Mylar)	0.52037	78.7	1.380E+00
 Polymethyl Methacrylate, (PMMA)	0.53937	74	1.190E+00
 Polytetrafluoroethylene, (Teflon)	0.47993	99.1	2.250E+00
-Polyvinyl Chloride, (PVC) 	0.51201 	108.2 	1.406E+00
+Polyvinyl Chloride, (PVC)	0.51201 	108.2 	1.406E+00
 Tissue, Soft (ICRU-44)	0.54996	74.7	1.060E+00
 Water, Liquid	0.55508	75	1.000E+00
 PLA, (XCOM)	0	0	1.108
