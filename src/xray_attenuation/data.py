@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple
+
 import polars as pl
 
 DATA_PATH = Path(__file__).parent / "data"
@@ -14,8 +14,8 @@ class Data:
         self._load_spectra()
 
     def _load_data_elements(self) -> None:
-        """Loads the NIST photon attenuation coefficient ([mu]=1/cm) for pure elements, from the
-        compilation files, as a Polars dataframe
+        """Loads the NIST photon attenuation coefficient ([mu]=1/cm) for pure
+        elements, from the compilation files, as a Polars dataframe
 
         Returns:
         """
@@ -35,7 +35,8 @@ class Data:
         )
 
     def _load_data_compounds(self) -> None:
-        """Loads the NIST photon attenuation coefficient ([mu]=1/cm) for some compounds, from the compilation files, as a Polars dataframe.
+        """Loads the NIST photon attenuation coefficient ([mu]=1/cm) for some
+        compounds, from the compilation files, as a Polars dataframe.
 
         Returns:
         """
@@ -91,19 +92,30 @@ class Data:
         Args:
             material (str): material name. Either from the elements or compounds lists
             energy (float): energy in keV
-            is_compound (bool, optional): If the material is a compound. Defaults to False.
+            is_compound (bool, optional): If the material is a compound.
+                Defaults to False.
 
         Returns:
-            float | None: Returns the linear attenuation coefficient if found, otherwise None
+            float | None: The linear attenuation coefficient if found, otherwise None
         """
         try:
             if not is_compound:
+                if not isinstance(energy, (int, float)):
+                    return self.df_elements.select(
+                        pl.col("Energy"), pl.col(material)
+                    ).collect()
+
                 mu = (
                     self.df_elements.select(pl.col("Energy"), pl.col(material))
                     .filter(pl.col("Energy") == energy)
                     .collect()
                 )[material][0]
             else:
+                if not isinstance(energy, (int, float)):
+                    return self.df_compounds.select(
+                        pl.col("Energy"), pl.col(material)
+                    ).collect()
+
                 mu = (
                     self.df_compounds.select(pl.col("Energy"), pl.col(material))
                     .filter(pl.col("Energy") == energy)

@@ -1,5 +1,6 @@
-from data import Data
 import pytest
+
+from xray_attenuation.data import Data
 
 
 class TestDataClass:

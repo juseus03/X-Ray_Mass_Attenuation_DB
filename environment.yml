@@ -1,12 +1,8 @@
+name: xray-attenuation
 channels:
   - conda-forge
 dependencies:
-  - python=3.12.2
-  - pytest
-  - streamlit
-  - polars
-  - plotly
-  - numpy
-  - matplotlib
-  - icecream
-  - pillow>=12.3.0
+  - python=3.12
+  - pip
+  - pip:
+      - "-e .[dev]"

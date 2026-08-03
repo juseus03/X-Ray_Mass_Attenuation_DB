@@ -2,7 +2,6 @@ from typing import List
 import numpy as np
 import os
 from icecream import ic
-import matplotlib.pyplot as plt
 
 
 def read_in_data(work_path: str, searched_extension: str) -> List:
@@ -93,7 +92,7 @@ np.savetxt(
     delimiter=",",
     header=",".join(data_labels),
     comments="",
-    fmt="%.6e"
+    fmt="%.6e",
 )
 
 ic(f"Export complete!")

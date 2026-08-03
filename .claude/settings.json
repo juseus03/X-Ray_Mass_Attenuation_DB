@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//tmp/**)",
+      "Bash(/mnt/sda3/Sebastian/FMF/PhD/X-Ray_Mass_Attenuation_DB/envs/bin/xray-transmission -m Al -t 0.1 -e 30)",
+      "Bash(echo \"--- exit $? ---\")",
+      "Bash(/mnt/sda3/Sebastian/FMF/PhD/X-Ray_Mass_Attenuation_DB/envs/bin/xray-transmission --help)",
+      "Bash(./envs/bin/ruff check *)",
+      "Bash(awk -F: '{split\\($1,a,\"/\"\\); print a[1]}')",
+      "Bash(./envs/bin/python -m pip install -q build)",
+      "Bash(./envs/bin/python -m build --wheel)",
+      "Bash(./envs/bin/pytest -q)",
+      "Bash(/mnt/sda3/Sebastian/FMF/PhD/X-Ray_Mass_Attenuation_DB/envs/bin/xray-transmission -m \"Cadmium Telluride\" -t 0.05 -e 20)"
+    ]
+  }
+}
