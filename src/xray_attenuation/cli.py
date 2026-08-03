@@ -275,10 +275,14 @@ class CLI:
         """Plots all the spectra in the current spectrum DF"""
 
         _, ax = plt.subplots()
-        for f in self.spectrum_df.columns:
+        for i, f in enumerate(self.spectrum_df.columns):
             if f == "Energy[keV]":
                 continue
-            lbl = f
+            if i == 1:
+                lbl = f"{f} keV"
+            else:
+                flt = self.filters[i - 2]
+                lbl = f"{flt.name} - {flt.thickness} cm"
             ax.plot(
                 self.spectrum_df["Energy[keV]"],
                 self.spectrum_df[f],
