@@ -169,11 +169,26 @@ class CLI:
     def add_filter(
         self, material_name: str, energy: float, thickness: float, is_compound: bool
     ) -> None:
+        """Registers a filter in the program, and applies it to the last spectrum
+
+        Args:
+            material_name (str): filter material
+            energy (float): maximum energy of the spectrum (keV)
+            thickness (float): thickness of the filter
+            is_compound (bool): flag if the filter is a compound or an element
+        """
         f = Filter(material_name, thickness, is_compound)
         self.filter_spectrum(energy, f)
         self.filters.append(f)
 
     def filter_spectrum(self, energy: float, pfilter: Filter) -> None:
+        """Calculates the filtered spectrum by accumulation. i.e. it filters
+        the last added spectrum
+
+        Args:
+            energy (float): maximum energy of the spectrum (keV)
+            pfilter (Filter): filter object
+        """
 
         mu = self.data.get_linear_attenuation(pfilter.name, None, pfilter.is_compound)
 
@@ -205,8 +220,13 @@ class CLI:
         ).drop(pfilter.name)
 
     def remove_filter(self, filter_index: int) -> None:
+        """Removes a filter and updates the current state of the spectrum df
 
-        old_columns = self.spectrum_df.columns
+        Args:
+            filter_index (int): filter index to remove
+        """
+
+        old_columns = self.spectrum_df.columns.copy()
 
         if filter_index == len(self.filters) - 1:
             self.filters.pop(filter_index)
@@ -224,6 +244,11 @@ class CLI:
             self.filter_spectrum(float(old_columns[1]), f)
 
     def add_base_spectrum(self, energy: float) -> None:
+        """Adds the first and unfiltered energy spectrum
+
+        Args:
+            energy (float): Maximum value of the energy spectrum in keV
+        """
         energy_column_name = str(int(energy))
         spectrum = self.data.df_spectra.select(
             pl.col("Energy[keV]"), pl.col(energy_column_name)
@@ -231,6 +256,7 @@ class CLI:
         self.spectrum_df = spectrum
 
     def plot_spectra(self) -> None:
+        """Plots all the spectra in the current spectrum DF"""
 
         _, ax = plt.subplots()
         for f in self.spectrum_df.columns:
