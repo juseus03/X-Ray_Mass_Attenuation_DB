@@ -74,7 +74,7 @@ class Filter:
 class CLI:
     def __init__(self, is_full_spectrum: bool = False):
         self.data = Data()
-        self.spectrum_list = {}
+        self.spectrum_df = None
         self.filters = []
         self.is_full_spectrum = is_full_spectrum
         if self.is_full_spectrum:
@@ -166,53 +166,86 @@ class CLI:
                 name = materials[index]
             return name
 
-    def filter_spectrum(
+    def add_filter(
         self, material_name: str, energy: float, thickness: float, is_compound: bool
     ) -> None:
-        filter = Filter(material_name, thickness, is_compound)
+        f = Filter(material_name, thickness, is_compound)
+        self.filter_spectrum(energy, f)
+        self.filters.append(f)
 
-        mu = self.data.get_linear_attenuation(
-            material_name, self.spectrum_list[str(int(energy))][:, 0], is_compound
+    def filter_spectrum(self, energy: float, pfilter: Filter) -> None:
+
+        mu = self.data.get_linear_attenuation(pfilter.name, None, pfilter.is_compound)
+
+        self.spectrum_df = self.spectrum_df.join(
+            mu, left_on="Energy[keV]", right_on="Energy", validate="1:1"
         )
-        ic(mu)
+        mu = self.spectrum_df.select(pfilter.name).to_numpy().flatten()
 
-        base_spectrum = self.spectrum_list[str(int(energy))]
-        filtered_spectrum = calculate_filtered_spectrum(base_spectrum, mu, thickness)
-        self.add_spectrum(filtered_spectrum, filter)
+        # Makes spectrum acumulative, so the last filter is applied to the last filtered spectrum
+        if len(self.filters) == 0:
+            spectrum = self.spectrum_df.select(str(int(energy))).to_numpy().flatten()
+        else:
+            spectrum = (
+                self.spectrum_df.select(
+                    f"{self.filters[-1].name}_{self.filters[-1].thickness}cm"
+                )
+                .to_numpy()
+                .flatten()
+            )
+
+        filtered_spectrum = pl.Series(
+            calculate_filtered_spectrum(spectrum, mu, pfilter.thickness)
+        )
+        self.spectrum_df = self.spectrum_df.with_columns(
+            pl.when(filtered_spectrum < 1e-35)
+            .then(0)
+            .otherwise(filtered_spectrum)
+            .alias(f"{pfilter.name}_{pfilter.thickness}cm")
+        ).drop(pfilter.name)
+
+    def remove_filter(self, filter_index: int) -> None:
+
+        old_columns = self.spectrum_df.columns
+
+        if filter_index == len(self.filters) - 1:
+            self.filters.pop(filter_index)
+            self.spectrum_df.drop_in_place(old_columns[-1])
+            ic(self.spectrum_df)
+            return
+
+        new_filters = self.filters[filter_index + 1 :]
+        self.filters = self.filters[:filter_index]
+        self.spectrum_df = self.spectrum_df.drop(
+            old_columns[filter_index + 2 :]
+        )  # +2 because of Energy and base spectrum columns
+
+        for f in new_filters:
+            self.filter_spectrum(float(old_columns[1]), f)
 
     def add_base_spectrum(self, energy: float) -> None:
         energy_column_name = str(int(energy))
         spectrum = self.data.df_spectra.select(
             pl.col("Energy[keV]"), pl.col(energy_column_name)
         )
-        self.spectrum_list[energy_column_name] = spectrum.to_numpy()
-        self.filters.append(None)  # No filter for the base spectrum
-
-    def add_spectrum(self, spectrum: pl.DataFrame, pfilter: Filter = None) -> None:
-        energy_column_name = str(int(np.max(spectrum[:, 0]) + 1))
-        self.spectrum_list[energy_column_name] = spectrum
-        self.filters.append(pfilter)
+        self.spectrum_df = spectrum
 
     def plot_spectra(self) -> None:
 
         _, ax = plt.subplots()
-        for dictuple, flt in zip(self.spectrum_list.items(), self.filters):
-            ic(flt)
-            key, spectrum = dictuple
-            lbl = (
-                f"{key} keV"
-                if flt is None
-                else f"{key} keV with {flt.thickness} cm of {flt.name}"
-            )
+        for f in self.spectrum_df.columns:
+            if f == "Energy[keV]":
+                continue
+            lbl = f
             ax.plot(
-                spectrum[:, 0],
-                spectrum[:, 1],
+                self.spectrum_df["Energy[keV]"],
+                self.spectrum_df[f],
                 label=lbl,
             )
         ax.set_xlabel("Energy [keV]")
         ax.set_ylabel("Intensity [a.u.]")
         ax.set_yscale("log")
-        ax.set_ylim(1e-10, 1)
+        ax.set_ylim(1e-10, 1e-5)
         plt.legend()
 
 
@@ -262,7 +295,12 @@ def main():
 
     if is_full_spectrum:
         cli.add_base_spectrum(energy)
-        cli.filter_spectrum(material_name, energy, thickness, is_compound)
+        cli.add_filter(material_name, energy, thickness, is_compound)
+        cli.add_filter(material_name, energy, thickness - 0.1, is_compound)
+        cli.add_filter(material_name, energy, thickness + 0.1, is_compound)
+
+        cli.remove_filter(1)
+
         cli.plot_spectra()
         plt.show()
         sys.exit(0)

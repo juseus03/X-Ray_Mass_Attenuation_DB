@@ -22,5 +22,4 @@ def test_calculate_filtered_spectrum():
     ]
 
     for i, fsp in enumerate(filtered_spectrum):
-        assert fsp[0] == spectrum[i][0]
-        assert fsp[1] == pytest.approx(expected_intensity[i], abs=1e-4)
+        assert fsp == pytest.approx(expected_intensity[i], abs=1e-4)

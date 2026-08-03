@@ -50,7 +50,7 @@ class Data:
 
         self.df_spectra = (
             pl.scan_csv(DATA_PATH / "W-Spectra/Spectra_9-100.csv")
-            .with_columns(pl.col("Energy[keV]").round(1))
+            .with_columns(pl.col("Energy[keV]").round(1, mode="half_away_from_zero"))
             .collect()
         )
 
@@ -100,7 +100,7 @@ class Data:
         """
         try:
             if not is_compound:
-                if not isinstance(energy, (int, float)):
+                if energy is None:
                     return self.df_elements.select(
                         pl.col("Energy"), pl.col(material)
                     ).collect()
@@ -111,7 +111,7 @@ class Data:
                     .collect()
                 )[material][0]
             else:
-                if not isinstance(energy, (int, float)):
+                if energy is None:
                     return self.df_compounds.select(
                         pl.col("Energy"), pl.col(material)
                     ).collect()

@@ -3,7 +3,7 @@ import numpy as np
 import polars as pl
 from icecream import ic
 
-# ic.disable()
+ic.disable()
 
 
 class Filter:

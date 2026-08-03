@@ -20,16 +20,13 @@ def calculate_filtered_spectrum(
     """Calculates the filtered spectrum based on the input spectrum and filter thickness
 
     Args:
-        spectrum (np.ndarray): Input spectrum with energy and intensity
+        spectrum (np.ndarray): Input spectrum with intensity
         thickness (float): Filter thickness
 
     Returns:
         np.ndarray: Filtered spectrum
     """
     # Assuming the first column is energy and the second column is intensity
-    energy = spectrum[:, 0]
-    intensity = spectrum[:, 1]
 
     # Calculate the transmission for each energy
-    new_intensity = intensity * get_transmission(mu, thickness)
-    return np.column_stack((energy, new_intensity))
+    return spectrum * get_transmission(mu, thickness)
