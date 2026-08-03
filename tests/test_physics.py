@@ -9,7 +9,7 @@ def test_get_transmission():
 
 
 def test_calculate_filtered_spectrum():
-    spectrum = np.array([[10, 100], [20, 200], [30, 300]])
+    spectrum = np.array([100, 200, 300])
     mu = np.array([0.1, 0.2, 0.3])
     thickness = 1.0
 

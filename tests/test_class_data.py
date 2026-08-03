@@ -1,6 +1,7 @@
+import polars as pl
 import pytest
 
-from xray_attenuation.data import Data
+from xray_attenuation.data import Data, MaterialNotFoundError
 
 
 class TestDataClass:
@@ -64,8 +65,8 @@ class TestDataClass:
         assert mu is None
 
     def test_get_linear_attenuation_element_not_found(self):
-        mu = self.data.get_linear_attenuation("Kryptonite", 100.0)
-        assert mu is None
+        with pytest.raises(MaterialNotFoundError):
+            self.data.get_linear_attenuation("Kryptonite", 100.0)
 
     def test_get_linear_attenuation_compound(self):
         mu = self.data.get_linear_attenuation(
@@ -74,11 +75,36 @@ class TestDataClass:
         assert mu == pytest.approx(138.9626446)
 
     def test_get_linear_attenuation_not_compound(self):
-        mu = self.data.get_linear_attenuation(
-            "Cadmium Telluride", 20.0, is_compound=False
-        )
-        assert mu is None
+        with pytest.raises(MaterialNotFoundError):
+            self.data.get_linear_attenuation(
+                "Cadmium Telluride", 20.0, is_compound=False
+            )
 
     def test_get_linear_attenuation_compound_not_found(self):
-        mu = self.data.get_linear_attenuation("Kryptonite", 20.0, is_compound=True)
-        assert mu is None
+        with pytest.raises(MaterialNotFoundError):
+            self.data.get_linear_attenuation("Kryptonite", 20.0, is_compound=True)
+
+    def test_get_linear_attenuation_curve(self):
+        curve = self.data.get_linear_attenuation_curve("Aluminum")
+        assert curve.shape == (1971, 2)
+        assert curve.columns == ["Energy", "Aluminum"]
+
+    def test_get_linear_attenuation_curve_matches_point_lookup(self):
+        curve = self.data.get_linear_attenuation_curve("Aluminum")
+        mu = curve.filter(pl.col("Energy") == 10.0)["Aluminum"][0]
+        assert mu == self.data.get_linear_attenuation("Aluminum", 10.0)
+
+    def test_get_linear_attenuation_curve_compound(self):
+        curve = self.data.get_linear_attenuation_curve(
+            "Cadmium Telluride", is_compound=True
+        )
+        assert curve.shape == (1971, 2)
+        assert curve.columns == ["Energy", "Cadmium Telluride"]
+
+    def test_get_linear_attenuation_curve_not_found(self):
+        with pytest.raises(MaterialNotFoundError):
+            self.data.get_linear_attenuation_curve("Kryptonite")
+
+    def test_get_linear_attenuation_curve_not_compound(self):
+        with pytest.raises(MaterialNotFoundError):
+            self.data.get_linear_attenuation_curve("Cadmium Telluride")

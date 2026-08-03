@@ -5,6 +5,10 @@ import polars as pl
 DATA_PATH = Path(__file__).parent / "data"
 
 
+class MaterialNotFoundError(KeyError):
+    """Raised when a material is not present in the attenuation tables"""
+
+
 class Data:
     """Class for managing the data"""
 
@@ -84,45 +88,51 @@ class Data:
 
         return None
 
-    def get_linear_attenuation(
-        self, material: str, energy: float, is_compound: bool = False
-    ) -> float | None:
-        """Returns the linear attenuation coefficient for a material
+    def get_linear_attenuation_curve(
+        self, material: str, is_compound: bool = False
+    ) -> pl.DataFrame:
+        """Returns the whole linear attenuation curve of a material
 
         Args:
             material (str): material name. Either from the elements or compounds lists
-            energy (float): energy in keV
             is_compound (bool, optional): If the material is a compound.
                 Defaults to False.
 
         Returns:
-            float | None: The linear attenuation coefficient if found, otherwise None
+            pl.DataFrame: two columns, "Energy" [keV] and the material's mu [1/cm]
+
+        Raises:
+            MaterialNotFoundError: if the material is not in the corresponding table
         """
-        try:
-            if not is_compound:
-                if energy is None:
-                    return self.df_elements.select(
-                        pl.col("Energy"), pl.col(material)
-                    ).collect()
+        frame = self.df_compounds if is_compound else self.df_elements
 
-                mu = (
-                    self.df_elements.select(pl.col("Energy"), pl.col(material))
-                    .filter(pl.col("Energy") == energy)
-                    .collect()
-                )[material][0]
-            else:
-                if energy is None:
-                    return self.df_compounds.select(
-                        pl.col("Energy"), pl.col(material)
-                    ).collect()
+        if material not in frame.collect_schema().names():
+            raise MaterialNotFoundError(material)
 
-                mu = (
-                    self.df_compounds.select(pl.col("Energy"), pl.col(material))
-                    .filter(pl.col("Energy") == energy)
-                    .collect()
-                )[material][0]
+        return frame.select(pl.col("Energy"), pl.col(material)).collect()
 
-        except Exception:
+    def get_linear_attenuation(
+        self, material: str, energy: float, is_compound: bool = False
+    ) -> float | None:
+        """Returns the linear attenuation coefficient for a material at one energy
+
+        Args:
+            material (str): material name. Either from the elements or compounds lists
+            energy (float): energy in keV. Must be an exact value of the energy grid
+            is_compound (bool, optional): If the material is a compound.
+                Defaults to False.
+
+        Returns:
+            float | None: The linear attenuation coefficient, or None if the energy
+                is not on the grid
+
+        Raises:
+            MaterialNotFoundError: if the material is not in the corresponding table
+        """
+        curve = self.get_linear_attenuation_curve(material, is_compound)
+        mu = curve.filter(pl.col("Energy") == energy)
+
+        if mu.is_empty():
             return None
 
-        return mu
+        return mu[material][0]
