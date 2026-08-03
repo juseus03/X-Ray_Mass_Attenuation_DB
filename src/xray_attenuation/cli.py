@@ -32,17 +32,18 @@ def set_arguments() -> argparse.ArgumentParser:
     parser.add_argument(
         "--material_name",
         "-m",
-        nargs="?",
+        nargs="+",
         help='Material name ("-" to show material list)',
-        default=None,
+        default=[],
     )
 
     parser.add_argument(
         "--thickness",
         "-t",
+        nargs="+",
         type=float,
         help="Thickness [cm] of material",
-        default=None,
+        default=[],
     )
 
     parser.add_argument(
@@ -181,7 +182,7 @@ class CLI:
             is_compound (bool): flag if the filter is a compound or an element
         """
         if thickness <= 0:
-            print(f"ERROR: Thickness must be > 0")
+            print("WARNING: Thickness must be > 0, no filter added")
             return
 
         f = Filter(material_name, thickness, is_compound)
@@ -295,20 +296,42 @@ class CLI:
         plt.legend()
 
 
-def main():
-    """Entrypoint for the CLI tool"""
+def _get_user_energy(cli: CLI, args) -> float:
 
-    parser = set_arguments()
-    args = parser.parse_args()
+    if args.energy is None:
+        return cli.get_user_input("energy")
+    if args.energy >= cli.min_energy and args.energy <= cli.max_energy:
+        return np.round(args.energy, 1)
+    print(
+        f"Error: Energy not in the database "
+        f"({cli.min_energy:.0f} keV - {cli.max_energy:.0f} keV)"
+    )
+    return cli.get_user_input("energy")
 
-    is_full_spectrum = args.full_spectrum
 
-    cli = CLI(is_full_spectrum)
-    # Get material name
-    if args.material_name is None or args.material_name == "-":
+def _get_single_material_name(cli: CLI, material_name: str) -> tuple[str, bool] | None:
+    if material_name is None or material_name == "-":
         name = cli.ask_for_materials()
     else:
-        name = args.material_name
+        name = material_name
+
+    return cli.data.resolve_material_name(name)
+
+
+# def _get_single_thickness(cli:CLI, thickness:float)->float
+
+
+def run_single_value(cli: CLI, args) -> None:
+
+    # Get material name
+    if (
+        args.material_name is None
+        or len(args.material_name) == 0
+        or args.material_name[0] == "-"
+    ):
+        name = cli.ask_for_materials()
+    else:
+        name = args.material_name[0]
 
     resolved = cli.data.resolve_material_name(name)
 
@@ -319,38 +342,16 @@ def main():
     material_name, is_compound = resolved
 
     # Get thickness
-    if args.thickness is None:
+    if args.thickness is None or len(args.thickness) == 0:
         thickness = cli.get_user_input("thickness")
-    elif args.thickness > 0:
-        thickness = args.thickness
+    elif args.thickness[0] > 0:
+        thickness = args.thickness[0]
     else:
         print("Error: Thickness must be greater than 0")
         thickness = cli.get_user_input("thickness")
 
     # Get energy
-    if args.energy is None:
-        energy = cli.get_user_input("energy")
-    elif args.energy >= cli.min_energy and args.energy <= cli.max_energy:
-        energy = np.round(args.energy, 1)
-    else:
-        print(
-            f"Error: Energy not in the database "
-            f"({cli.min_energy:.0f} keV - {cli.max_energy:.0f} keV)"
-        )
-        energy = cli.get_user_input("energy")
-
-    if is_full_spectrum:
-        cli.add_base_spectrum(energy)
-        cli.add_filter(material_name, energy, thickness, is_compound)
-        cli.add_filter(material_name, energy, thickness, is_compound)
-        cli.add_filter(material_name, energy, thickness - 0.1, is_compound)
-        cli.add_filter(material_name, energy, thickness + 0.1, is_compound)
-
-        cli.remove_filter(2)
-
-        cli.plot_spectra()
-        plt.show()
-        sys.exit(0)
+    energy = _get_user_energy(cli, args)
 
     # Get linear attenuation coefficient
     mu = cli.data.get_linear_attenuation(material_name, energy, is_compound)
@@ -365,6 +366,55 @@ def main():
         f"For {thickness} cm of '{material_name}' the transmission of photons, "
         f"with energy {energy} keV, is around {transmission} %"
     )
+
+
+def main():
+    """Entrypoint for the CLI tool"""
+
+    parser = set_arguments()
+    args = parser.parse_args()
+
+    is_full_spectrum = args.full_spectrum
+
+    cli = CLI(is_full_spectrum)
+
+    # Single transmission value
+    if not is_full_spectrum:
+        if len(args.thickness) > 1 or len(args.material_name) > 1:
+            print("ERROR: For multiple filter/material values use the option -f")
+            exit(-1)
+        run_single_value(cli, args)
+        return
+
+    # Full spectrum transmission w/ filters
+    energy = _get_user_energy(cli, args)
+    cli.add_base_spectrum(energy)
+
+    nfilters = max(len(args.material_name), len(args.thickness))
+    print(f"Calculating {nfilters} filters")
+
+    if len(args.material_name) == len(args.thickness):
+        for m, t in zip(args.material_name, args.thickness):
+            resolved = _get_single_material_name(cli, m)
+            if resolved is None:
+                sys.stderr.write(f"Error: '{m}' is not in the database\n")
+                sys.exit(1)
+            mname, is_compound = resolved
+            cli.add_filter(mname, energy, t, is_compound)
+    else:
+        # Map n->m:
+        for m in args.material_name:
+            resolved = _get_single_material_name(cli, m)
+            if resolved is None:
+                sys.stderr.write(f"Error: '{m}' is not in the database\n")
+                sys.exit(1)
+            mname, is_compound = resolved
+            for t in args.thickness:
+                cli.add_filter(mname, energy, t, is_compound)
+
+    cli.plot_spectra()
+    plt.show()
+    sys.exit(0)
 
 
 if __name__ == "__main__":
