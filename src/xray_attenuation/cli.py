@@ -1,16 +1,21 @@
 import argparse
+import re
 import sys
 
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
+import tempfile
 
+from datetime import datetime
 from pathlib import Path
 from icecream import ic
 from xray_attenuation.data import Data
 from xray_attenuation.physics import get_transmission, calculate_filtered_spectrum
 
 DATA_PATH = Path(__file__).parent / "data"
+TMP_PATH = Path(tempfile.gettempdir())
+
 plt.style.use(DATA_PATH / "presentation.mplstyle")
 
 MAX_ENERGY = 200  # keV
@@ -62,7 +67,28 @@ def set_arguments() -> argparse.ArgumentParser:
         default=False,
     )
 
+    parser.add_argument(
+        "--save_plot",
+        "-s",
+        action="store_true",
+        help="Save plot",
+        default=False,
+    )
+
     return parser
+
+
+def _sanitize_for_filename(name: str) -> str:
+    """Turns a material name into a filename-safe token
+
+    Args:
+        name (str): material name, possibly with spaces, commas or parentheses
+
+    Returns:
+        str: the name with every run of unsupported characters collapsed into a
+            single underscore
+    """
+    return re.sub(r"[^\w.-]+", "_", name.strip()).strip("_")
 
 
 class Filter:
@@ -76,11 +102,14 @@ class Filter:
 
 
 class CLI:
-    def __init__(self, is_full_spectrum: bool = False):
+    def __init__(self, is_full_spectrum: bool = False, save_plot: bool = False):
         self.data = Data()
         self.spectrum_df = None
+        self.max_kv = None
         self.filters = []
         self.is_full_spectrum = is_full_spectrum
+        self.save_plot = save_plot
+
         if self.is_full_spectrum:
             self.min_energy = MIN_ENERGY_FULL_SPECTRUM
             self.max_energy = MAX_ENERGY_FULL_SPECTRUM
@@ -271,11 +300,31 @@ class CLI:
             pl.col("Energy[keV]"), pl.col(energy_column_name)
         )
         self.spectrum_df = spectrum
+        self.max_kv = energy_column_name
+
+    def build_plot_path(self) -> Path:
+        """Builds a readable, collision-free PNG path in the system temp directory
+
+        Returns:
+            Path: temp-directory path named after the tube voltage, the filters
+                and the current time
+        """
+        parts = ["xray_spectrum", f"{self.max_kv}kV"]
+        parts += [
+            f"{_sanitize_for_filename(f.name)}-{f.thickness:g}cm" for f in self.filters
+        ]
+        stem = "_".join(parts)
+
+        # Stay well inside the 255 byte filename limit when many filters are stacked
+        if len(stem) > 180:
+            stem = f"xray_spectrum_{self.max_kv}kV_{len(self.filters)}filters"
+
+        return TMP_PATH / f"{stem}_{datetime.now():%Y%m%d-%H%M%S}.png"
 
     def plot_spectra(self) -> None:
         """Plots all the spectra in the current spectrum DF"""
 
-        _, ax = plt.subplots()
+        fig, ax = plt.subplots()
         for i, f in enumerate(self.spectrum_df.columns):
             if f == "Energy[keV]":
                 continue
@@ -295,9 +344,26 @@ class CLI:
         ax.set_ylim(1e-10, 1e-5)
         plt.legend()
 
+        if self.save_plot:
+            path = self.build_plot_path()
+            try:
+                fig.savefig(path)
+            except OSError as exc:
+                sys.stderr.write(f"Error: could not save plot to {path} ({exc})\n")
+            else:
+                print(f"Plot saved to: {path}")
+
 
 def _get_user_energy(cli: CLI, args) -> float:
+    """Interactive mode for getting the energy value from the user
 
+    Args:
+        cli (CLI): cli object
+        args (_type_): argparser object
+
+    Returns:
+        float: energy value
+    """
     if args.energy is None:
         return cli.get_user_input("energy")
     if args.energy >= cli.min_energy and args.energy <= cli.max_energy:
@@ -310,15 +376,21 @@ def _get_user_energy(cli: CLI, args) -> float:
 
 
 def _get_single_material_name(cli: CLI, material_name: str) -> tuple[str, bool] | None:
+    """Interactive mode for getting the material name from the user
+
+    Args:
+        cli (CLI): _description_
+        material_name (str): given material name from the user
+
+    Returns:
+        tuple[str, bool] | None: If the canonical name of the material is in the db otherwise false
+    """
     if material_name is None or material_name == "-":
         name = cli.ask_for_materials()
     else:
         name = material_name
 
     return cli.data.resolve_material_name(name)
-
-
-# def _get_single_thickness(cli:CLI, thickness:float)->float
 
 
 def run_single_value(cli: CLI, args) -> None:
@@ -381,7 +453,10 @@ def main():
 
     is_full_spectrum = args.full_spectrum
 
-    cli = CLI(is_full_spectrum)
+    cli = CLI(is_full_spectrum, args.save_plot)
+
+    if args.save_plot and not is_full_spectrum:
+        print("WARNING: --save_plot only applies to full-spectrum mode (-f), ignoring")
 
     # Single transmission value
     if not is_full_spectrum:

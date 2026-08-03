@@ -40,6 +40,11 @@ xray-transmission -m Al -t 0.1 -e 30
   use `-` or omit to get an interactive material list
 - `-t/--thickness`: thickness in cm
 - `-e/--energy`: photon energy in keV (3-200)
+- `-f/--full-spectrum`: filter a whole tungsten spectrum instead of a single energy. `-m` and
+  `-t` then accept several values (one filter each, or every material × every thickness), `-e`
+  becomes the tube voltage (9-100 kV), and the result is plotted
+- `-s/--save_plot`: also write the plot as a PNG into the system temp directory and print the
+  path. Full-spectrum mode only; the interactive window still opens
 - Any omitted argument is prompted for interactively
 
 **Web Interface (Streamlit):** still the un-ported `code/app.py`
