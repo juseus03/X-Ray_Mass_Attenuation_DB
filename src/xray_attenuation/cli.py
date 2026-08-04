@@ -67,7 +67,7 @@ def set_arguments() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--save_plot",
+        "--save-plot",
         "-s",
         action="store_true",
         help="Save plot",
@@ -356,7 +356,7 @@ class CLI:
                 if f == "Energy[keV]":
                     continue
                 if i == 1:
-                    lbl = f"{f} keV"
+                    lbl = f"{f} kV"
                 else:
                     flt = self.filters[i - 2]
                     lbl = f"+ {flt.name} {flt.thickness} cm"
