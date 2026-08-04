@@ -1,16 +1,16 @@
 import argparse
 import re
 import sys
+import tempfile
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import polars as pl
-import tempfile
 
-from datetime import datetime
-from pathlib import Path
 from xray_attenuation.data import Data
-from xray_attenuation.physics import get_transmission, calculate_filtered_spectrum
-from dataclasses import dataclass
+from xray_attenuation.physics import calculate_filtered_spectrum, get_transmission
 
 DATA_PATH = Path(__file__).parent / "data"
 TMP_PATH = Path(tempfile.gettempdir())
@@ -244,7 +244,8 @@ class CLI:
         )
         mu = self.spectrum_df.select(pfilter.name).to_numpy().flatten()
 
-        # Makes spectrum acumulative, so the last filter is applied to the last filtered spectrum
+        # Makes spectrum acumulative,
+        # the last filter is applied to the last filtered spectrum
         if len(self.filters) == 0:
             spectrum = (
                 self.spectrum_df.select(str(int(np.round(energy, 0))))

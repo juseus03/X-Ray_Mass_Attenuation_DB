@@ -1,10 +1,10 @@
-from typing import List
-import numpy as np
 import os
+
+import numpy as np
 from icecream import ic
 
 
-def read_in_data(work_path: str, searched_extension: str) -> List:
+def read_in_data(work_path: str, searched_extension: str) -> list:
     """Returns a list with the file names in a given path
 
     Args:
@@ -12,7 +12,7 @@ def read_in_data(work_path: str, searched_extension: str) -> List:
         searched_extension (str): file extention to search for
 
     Returns:
-        List: List with the file names
+        list: List with the file names
     """
     files = []
     for file in os.listdir(work_path):
@@ -63,9 +63,7 @@ for f in files:
 
         idx0 = i1 + 1
         idx1 = idx0 + data.shape[1]  # End index should be start + number of columns
-        ic(
-            f"e0={e0}, e1={e1}, data shape={data.shape}, assigning to columns {idx0}:{idx1}"
-        )
+        ic(f"e0={e0}, e1={e1}, shape={data.shape}, assigning to columns {idx0}:{idx1}")
         i1 = idx1
 
         new_shape = (int(all_data.shape[0] - data.shape[0]), data.shape[1])
@@ -95,4 +93,4 @@ np.savetxt(
     fmt="%.6e",
 )
 
-ic(f"Export complete!")
+ic("Export complete!")

@@ -1,6 +1,7 @@
-import pytest
 import numpy as np
-from xray_attenuation.physics import get_transmission, calculate_filtered_spectrum
+import pytest
+
+from xray_attenuation.physics import calculate_filtered_spectrum, get_transmission
 
 
 def test_get_transmission():
