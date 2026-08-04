@@ -5,7 +5,6 @@ import sys
 import numpy as np
 import polars as pl
 import tempfile
-import matplotlib.pyplot as plt
 
 from datetime import datetime
 from pathlib import Path
@@ -119,41 +118,50 @@ class CLI:
     def get_user_input(self, input_name: str) -> float:
         """Prompts the user for either a thickness value or an energy value
 
+        Re-prompts until the value is valid, so a stream of bad input costs nothing.
+
         Args:
             input_name (str): thickness or energy, indicating which value to prompt for
 
         Returns:
-            float: The user-supplied value for thickness or energy. ValueError if the
-                input_name is not recognized
+            float: The user-supplied value for thickness or energy
+
+        Raises:
+            ValueError: if input_name is neither "thickness" nor "energy"
         """
 
-        if input_name.lower() == "thickness":
-            sys.stderr.write("--- Material thickness [cm]: ")
-            try:
-                thickness = float(input(""))
-                if thickness <= 0:
-                    print("Error: Thickness must be greater than 0")
-                    return self.get_user_input("thickness")
-                return thickness
-            except ValueError:
-                print("Error: Please enter a valid number for thickness.")
-                return self.get_user_input("thickness")
+        kind = input_name.lower()
+        if kind not in ("thickness", "energy"):
+            raise ValueError(
+                f"Unknown input '{input_name}', expected 'thickness' or 'energy'"
+            )
 
-        if input_name.lower() == "energy":
-            sys.stderr.write("--- Photon energy [keV]: ")
+        while True:
+            if kind == "thickness":
+                sys.stderr.write("--- Material thickness [cm]: ")
+            else:
+                sys.stderr.write("--- Photon energy [keV]: ")
+
             try:
-                energy = float(input(""))
-                energy = np.round(energy, 1)
-                if energy < self.min_energy or energy > self.max_energy:
-                    print(
-                        f"Error: Energy not in the database ({self.min_energy} keV - {self.max_energy} keV)"
-                    )
-                    return self.get_user_input("energy")
-                return energy
+                value = float(input(""))
             except ValueError:
-                print("Error: Please enter a valid number for energy.")
-                return self.get_user_input("energy")
-        raise ValueError
+                print(f"Error: Please enter a valid number for {kind}.")
+                continue
+
+            if kind == "thickness":
+                if value <= 0:
+                    print("Error: Thickness must be greater than 0")
+                    continue
+                return value
+
+            energy = np.round(value, 1)
+            if energy < self.min_energy or energy > self.max_energy:
+                print(
+                    f"Error: Energy not in the database "
+                    f"({self.min_energy} keV - {self.max_energy} keV)"
+                )
+                continue
+            return energy
 
     def ask_for_materials(self) -> str:
         """User input for selection of a material in the data-base
@@ -230,6 +238,8 @@ class CLI:
             pfilter.name, pfilter.is_compound
         )
 
+        # Inner join on purpose: it trims the spectrum's 0.1-2.9 keV rows, which the
+        # NIST tables (3-200 keV) have no mu for. 1000 rows in, 971 out
         self.spectrum_df = self.spectrum_df.join(
             mu_curve, left_on="Energy[keV]", right_on="Energy", validate="1:1"
         )
@@ -295,6 +305,15 @@ class CLI:
             energy (float): Maximum value of the energy spectrum in keV
         """
         energy_column_name = str(int(np.round(energy, 0)))
+
+        # Spectra exist only at integer kV, so anything else is snapped. np.round is
+        # half-to-even, hence 60.5 -> 60 but 61.5 -> 62; say so rather than snap quietly
+        if float(energy_column_name) != energy:
+            print(
+                f"NOTICE: No {energy} kV spectrum in the database, "
+                f"using the {energy_column_name} kV one instead"
+            )
+
         spectrum = self.data.df_spectra.select(
             pl.col("Energy[keV]"), pl.col(energy_column_name)
         )
@@ -323,44 +342,51 @@ class CLI:
     def plot_spectra(self) -> None:
         """Plots all the spectra in the current spectrum DF"""
 
-        plt.style.use(DATA_PATH / "presentation.mplstyle")
+        import matplotlib.pyplot as plt
 
-        fig, ax = plt.subplots()
-        for i, f in enumerate(self.spectrum_df.columns):
-            if f == "Energy[keV]":
-                continue
-            if i == 1:
-                lbl = f"{f} keV"
-            else:
-                flt = self.filters[i - 2]
-                lbl = f"+ {flt.name} {flt.thickness} cm"
-            ax.plot(
-                self.spectrum_df["Energy[keV]"],
-                self.spectrum_df[f],
-                label=lbl,
-            )
-        ax.set_xlabel("Energy [keV]")
-        ax.set_ylabel("Intensity [a.u.]")
-        ax.set_yscale("log")
-        ax.set_ylim(1e-10, 1e-5)
-        plt.legend()
+        if self.spectrum_df is None:
+            print("ERROR: No spectrum to plot, call add_base_spectrum first")
+            return
 
-        if self.save_plot:
-            path = self.build_plot_path()
-            try:
-                fig.savefig(path)
-            except OSError as exc:
-                sys.stderr.write(f"Error: could not save plot to {path} ({exc})\n")
-            else:
-                print(f"Plot saved to: {path}")
+        # style.context rather than style.use: the style stays on this figure instead of
+        # leaking into the global rcParams of whatever else imports this module
+        with plt.style.context(DATA_PATH / "presentation.mplstyle"):
+            fig, ax = plt.subplots()
+            for i, f in enumerate(self.spectrum_df.columns):
+                if f == "Energy[keV]":
+                    continue
+                if i == 1:
+                    lbl = f"{f} keV"
+                else:
+                    flt = self.filters[i - 2]
+                    lbl = f"+ {flt.name} {flt.thickness} cm"
+                ax.plot(
+                    self.spectrum_df["Energy[keV]"],
+                    self.spectrum_df[f],
+                    label=lbl,
+                )
+            ax.set_xlabel("Energy [keV]")
+            ax.set_ylabel("Intensity [a.u.]")
+            ax.set_yscale("log")
+            ax.set_ylim(1e-10, 1e-5)
+            ax.legend()
+
+            if self.save_plot:
+                path = self.build_plot_path()
+                try:
+                    fig.savefig(path)
+                except OSError as exc:
+                    sys.stderr.write(f"Error: could not save plot to {path} ({exc})\n")
+                else:
+                    print(f"Plot saved to: {path}")
 
 
-def _get_user_energy(cli: CLI, args) -> float:
+def _get_user_energy(cli: CLI, args: argparse.Namespace) -> float:
     """Interactive mode for getting the energy value from the user
 
     Args:
         cli (CLI): cli object
-        args (_type_): argparser object
+        args (argparse.Namespace): parsed command line arguments
 
     Returns:
         float: energy value
@@ -380,11 +406,12 @@ def _get_single_material_name(cli: CLI, material_name: str) -> tuple[str, bool] 
     """Interactive mode for getting the material name from the user
 
     Args:
-        cli (CLI): _description_
+        cli (CLI): cli object
         material_name (str): given material name from the user
 
     Returns:
-        tuple[str, bool] | None: If the canonical name of the material is in the db otherwise false
+        tuple[str, bool] | None: (canonical name, is_compound) if the material is in the
+            database, otherwise None
     """
     if material_name is None or material_name == "-":
         name = cli.ask_for_materials()
@@ -394,12 +421,12 @@ def _get_single_material_name(cli: CLI, material_name: str) -> tuple[str, bool] 
     return cli.data.resolve_material_name(name)
 
 
-def run_single_value(cli: CLI, args) -> None:
+def run_single_value(cli: CLI, args: argparse.Namespace) -> None:
     """Single value calculation for transmission
 
     Args:
         cli (CLI): CLI object
-        args (_type_): cmd line arguments object
+        args (argparse.Namespace): parsed command line arguments
     """
     # Get material name
     if (
@@ -446,7 +473,7 @@ def run_single_value(cli: CLI, args) -> None:
     )
 
 
-def main():
+def main() -> None:
     """Entrypoint for the CLI tool"""
 
     parser = set_arguments()
@@ -463,11 +490,12 @@ def main():
     if not is_full_spectrum:
         if len(args.thickness) > 1 or len(args.material_name) > 1:
             print("ERROR: For multiple filter/material values use the option -f")
-            exit(-1)
+            sys.exit(1)
         run_single_value(cli, args)
         return
 
     # Full spectrum transmission w/ filters
+    import matplotlib.pyplot as plt
 
     if len(args.thickness) == 0 or len(args.material_name) == 0:
         print("WARNING: At least one thickness and one material should be passed")
@@ -475,9 +503,6 @@ def main():
 
     energy = _get_user_energy(cli, args)
     cli.add_base_spectrum(energy)
-
-    nfilters = max(len(args.material_name), len(args.thickness))
-    print(f"Calculating {nfilters} filters")
 
     if len(args.material_name) == len(args.thickness):
         for m, t in zip(args.material_name, args.thickness):
@@ -498,8 +523,9 @@ def main():
             for t in args.thickness:
                 cli.add_filter(mname, energy, t, is_compound)
 
-    ic(len(cli.filters))
-    ic(cli.filters)
+    # Counted after the fact: the two branches build different numbers of filters, and
+    # add_filter skips any with a non-positive thickness
+    print(f"Calculated {len(cli.filters)} filters")
 
     cli.plot_spectra()
     plt.show()

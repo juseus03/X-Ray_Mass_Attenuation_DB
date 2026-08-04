@@ -12,7 +12,8 @@
       "Bash(./envs/bin/pytest -q)",
       "Bash(/mnt/sda3/Sebastian/FMF/PhD/X-Ray_Mass_Attenuation_DB/envs/bin/xray-transmission -m \"Cadmium Telluride\" -t 0.05 -e 20)",
       "Bash(./envs/bin/python -c ' *)",
-      "Bash(MPLBACKEND=Agg ./envs/bin/python -c ' *)"
+      "Bash(MPLBACKEND=Agg ./envs/bin/python -c ' *)",
+      "Bash(./envs/bin/python -m pytest -q)"
     ]
   }
 }
