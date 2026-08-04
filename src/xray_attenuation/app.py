@@ -19,6 +19,8 @@ class AppState:
     spectrum_list = cli.data.get_spectrum_list()
     current_spectrum_idx = 0
 
+    material_list = cli.data.get_materials_list()
+
     def get_current_base_spectrum(self):
         return self.spectrum_list[self.current_spectrum_idx]
 
@@ -29,6 +31,14 @@ class AppState:
 
 
 def gui_commands(app_state: AppState):
+    static = gui_commands
+
+    if not hasattr(static, "material_idx"):
+        static.material_idx = 0
+
+    if not hasattr(static, "thickness"):
+        static.thickness = 0.1
+
     imgui.separator_text("Spectrum")
     imgui.text("Energy")
     imgui.same_line()
@@ -45,6 +55,28 @@ def gui_commands(app_state: AppState):
             if is_selected:
                 imgui.set_item_default_focus()
         imgui.end_combo()
+
+    imgui.separator_text("Filters")
+    materials = app_state.material_list
+    if imgui.begin_combo("##filters", materials[static.material_idx]):
+        for n, m in enumerate(materials):
+            is_selected = static.material_idx == n
+            _, is_selected = imgui.selectable(m, is_selected)
+            if is_selected:
+                static.material_idx = n
+            if is_selected:
+                imgui.set_item_default_focus()
+        imgui.end_combo()
+
+    changed, static.thickness = imgui.input_float(
+        "Thickness [cm]", static.thickness, 0.001, 0.1
+    )
+
+    if changed:
+        static.thickness = static.thickness if static.thickness > 0 else 0
+
+    if imgui.button("+Add"):
+        print("clicked")
 
 
 def gui_plot(app_sate: AppState):

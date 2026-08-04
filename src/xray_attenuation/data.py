@@ -139,3 +139,16 @@ class Data:
 
     def get_spectrum_list(self) -> list[str]:
         return self.df_spectra.columns[1:]
+
+    def get_materials_list(self) -> list[str]:
+
+        elements_name = self.df_elements_names["Element"]
+        elements_symbol = self.df_elements_names["Symbol"]
+
+        materials = [
+            f"{n} ({s})" for n, s in zip(elements_name, elements_symbol, strict=True)
+        ]
+
+        compound_names = self.df_compounds_names["Material"].to_list()
+        materials += compound_names
+        return materials
