@@ -4,19 +4,19 @@ import sys
 
 import numpy as np
 import polars as pl
-import matplotlib.pyplot as plt
 import tempfile
+import matplotlib.pyplot as plt
 
 from datetime import datetime
 from pathlib import Path
 from icecream import ic
 from xray_attenuation.data import Data
 from xray_attenuation.physics import get_transmission, calculate_filtered_spectrum
+from dataclasses import dataclass
 
 DATA_PATH = Path(__file__).parent / "data"
 TMP_PATH = Path(tempfile.gettempdir())
 
-plt.style.use(DATA_PATH / "presentation.mplstyle")
 
 MAX_ENERGY = 200  # keV
 MIN_ENERGY = 3  # keV
@@ -91,22 +91,21 @@ def _sanitize_for_filename(name: str) -> str:
     return re.sub(r"[^\w.-]+", "_", name.strip()).strip("_")
 
 
+@dataclass
 class Filter:
-    def __init__(self, pname: str, pthickness: float, p_is_compound: bool) -> None:
-        self.name = pname
-        self.thickness = pthickness
-        self.is_compound = p_is_compound
+    """Class to model a material filter"""
 
-    def __str__(self) -> str:
-        return f"Filter({self.name},{self.thickness}cm)"
+    name: str
+    thickness: float
+    is_compound: bool
 
 
 class CLI:
     def __init__(self, is_full_spectrum: bool = False, save_plot: bool = False):
         self.data = Data()
-        self.spectrum_df = None
-        self.max_kv = None
-        self.filters = []
+        self.spectrum_df: pl.DataFrame | None = None
+        self.max_kv: str | None = None
+        self.filters: list[Filter] = []
         self.is_full_spectrum = is_full_spectrum
         self.save_plot = save_plot
 
@@ -124,7 +123,7 @@ class CLI:
             input_name (str): thickness or energy, indicating which value to prompt for
 
         Returns:
-            float: The user-supplied value for thickness or energy. -1 if the
+            float: The user-supplied value for thickness or energy. ValueError if the
                 input_name is not recognized
         """
 
@@ -287,7 +286,7 @@ class CLI:
         )  # +2 because of Energy and base spectrum columns
 
         for f in new_filters:
-            self.add_filter(f.name, float(old_columns[1]), f.thickness, f.is_compound)
+            self.add_filter(f.name, float(self.max_kv), f.thickness, f.is_compound)
 
     def add_base_spectrum(self, energy: float) -> None:
         """Adds the first and unfiltered energy spectrum
@@ -324,6 +323,8 @@ class CLI:
     def plot_spectra(self) -> None:
         """Plots all the spectra in the current spectrum DF"""
 
+        plt.style.use(DATA_PATH / "presentation.mplstyle")
+
         fig, ax = plt.subplots()
         for i, f in enumerate(self.spectrum_df.columns):
             if f == "Energy[keV]":
@@ -332,7 +333,7 @@ class CLI:
                 lbl = f"{f} keV"
             else:
                 flt = self.filters[i - 2]
-                lbl = f"{flt.name} - {flt.thickness} cm"
+                lbl = f"+ {flt.name} {flt.thickness} cm"
             ax.plot(
                 self.spectrum_df["Energy[keV]"],
                 self.spectrum_df[f],
@@ -467,6 +468,11 @@ def main():
         return
 
     # Full spectrum transmission w/ filters
+
+    if len(args.thickness) == 0 or len(args.material_name) == 0:
+        print("WARNING: At least one thickness and one material should be passed")
+        print("\n Plotting unfiltered spectrum")
+
     energy = _get_user_energy(cli, args)
     cli.add_base_spectrum(energy)
 
@@ -491,6 +497,9 @@ def main():
             mname, is_compound = resolved
             for t in args.thickness:
                 cli.add_filter(mname, energy, t, is_compound)
+
+    ic(len(cli.filters))
+    ic(cli.filters)
 
     cli.plot_spectra()
     plt.show()

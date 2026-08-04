@@ -6,6 +6,14 @@ from xray_attenuation.physics import get_transmission, calculate_filtered_spectr
 def test_get_transmission():
     assert get_transmission(0, 0.1) == 1
     assert get_transmission(1.0, 0.5) == pytest.approx(0.6065, abs=1e-4)
+    assert get_transmission(1.0, 1e6) == pytest.approx(0, abs=1e-4)
+
+    assert get_transmission(0.720613425, 0.1) == pytest.approx(
+        0.93047, abs=1e-4
+    )  # 1mm Al @ 60 keV
+    assert get_transmission(3.758245771, 0.5) == pytest.approx(
+        0.1527, abs=1e-4
+    )  # 5mm CdTe @ 150 keV
 
 
 def test_calculate_filtered_spectrum():
