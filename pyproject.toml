@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
     "polars>=1.0",
     "numpy>=1.26",
+    "matplotlib>=3.8",
 ]
 
 [project.optional-dependencies]

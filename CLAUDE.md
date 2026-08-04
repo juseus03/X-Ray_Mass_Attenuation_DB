@@ -61,7 +61,7 @@ conda env create -f environment.yml -p ./envs
 ./envs/bin/pip install -e ".[dev]"
 ```
 
-Runtime deps: `polars>=1.0`, `numpy>=1.26`. Dev extra: `pytest`, `ruff`.
+Runtime deps: `polars>=1.0`, `numpy>=1.26`, `matplotlib>=3.8`. Dev extra: `pytest`, `ruff`.
 Requires Python >=3.11; the pinned dev interpreter is 3.12.2.
 
 ## Testing and Linting
@@ -78,10 +78,6 @@ the `src/` layout there is deliberately no `__init__.py` in `tests/` and no path
 ## Intentional Design Decisions
 
 These are deliberate. Do **not** report them as defects in a code review.
-
-**Dependencies are deliberately incomplete.** `cli.py` imports `matplotlib` and `icecream`, neither
-of which is declared in `pyproject.toml`. The dependency set is not final and will be reconciled in
-one pass once the GUI layer lands. Not a packaging bug for now.
 
 **Filter stacking is cumulative.** Each `add_filter` applies to the output of the previous filter,
 so the column `N_Material_Xcm` holds the entire stack up to and including that filter, not that

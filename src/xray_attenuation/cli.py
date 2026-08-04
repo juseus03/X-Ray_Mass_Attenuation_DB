@@ -8,7 +8,6 @@ import tempfile
 
 from datetime import datetime
 from pathlib import Path
-from icecream import ic
 from xray_attenuation.data import Data
 from xray_attenuation.physics import get_transmission, calculate_filtered_spectrum
 from dataclasses import dataclass
