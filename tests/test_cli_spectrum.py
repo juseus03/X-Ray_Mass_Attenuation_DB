@@ -224,7 +224,7 @@ class TestPlotSpectra:
 
         ax = plt.gcf().axes[0]
         assert [line.get_label() for line in ax.get_lines()] == [
-            "60 keV",
+            "60 kV",
             "+ Aluminum 0.1 cm",
             "+ Copper 0.2 cm",
         ]
@@ -235,7 +235,7 @@ class TestPlotSpectra:
         cli.plot_spectra()
 
         ax = plt.gcf().axes[0]
-        assert [line.get_label() for line in ax.get_lines()] == ["60 keV"]
+        assert [line.get_label() for line in ax.get_lines()] == ["60 kV"]
 
     def test_axes_are_labelled_and_log_scaled(self, cli):
         build_stack(cli, [("Aluminum", 0.1)])
