@@ -10,23 +10,20 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v3
-      with:
-        python-version: '3.12'
-    - name: Display Python version
-      run: python -c "import sys; print(sys.version)"
-
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v4
       with:
         miniforge-version: latest
         activate-environment: anaconda-client-env
         environment-file: environment.yml
+        python-version: 3.12
+        auto-activate: true
     - run: |
         conda info
         conda list
-        
+    - name: Display Python version
+      run: python -c "import sys; print(sys.version)"
+
 
     # - name: Cache conda
     #   uses: actions/cache@v5
