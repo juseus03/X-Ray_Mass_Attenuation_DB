@@ -505,7 +505,7 @@ def main() -> None:
     cli.add_base_spectrum(energy)
 
     if len(args.material_name) == len(args.thickness):
-        for m, t in zip(args.material_name, args.thickness):
+        for m, t in zip(args.material_name, args.thickness, strict=True):
             resolved = _get_single_material_name(cli, m)
             if resolved is None:
                 sys.stderr.write(f"Error: '{m}' is not in the database\n")
