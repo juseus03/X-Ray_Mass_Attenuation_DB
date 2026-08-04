@@ -1,43 +1,58 @@
 name: Python Package using Conda
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build-linux:
     runs-on: ubuntu-latest
-    strategy:
-      max-parallel: 5
-
+    defaults:
+      run:
+        shell: bash -el {0}    
     steps:
     - uses: actions/checkout@v4
+
+    - name: Get Date
+      id: get-date
+      run: echo "today=$(/bin/date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
+
+    - name: Cache conda packages
+      id: cache-conda
+      uses: actions/cache@v5
+      env:
+        CACHE_NUMBER: 0
+      with:
+        path: ~/conda_pkgs_dir
+        key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('environment.yml') }}-${{ steps.get-date.outputs.today }}
+        restore-keys: |
+          ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('environment.yml') }}-
+          ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
+
+    - name: Cache pip downloads
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+        restore-keys: ${{ runner.os }}-pip-
+
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v4
       with:
         miniforge-version: latest
-        activate-environment: anaconda-client-env
+        activate-environment: xray-attenuation
         environment-file: environment.yml
-        python-version: 3.12
         auto-activate: true
-    - run: |
+
+    - name: Display versions
+      run: |
         conda info
-        conda list
-    - name: Display Python version
-      run: python -c "import sys; print(sys.version)"
+        python -c "import sys; print(sys.version)"
 
+    - name: Lint with ruff
+      run: ruff check --output-format=github
 
-    # - name: Cache conda
-    #   uses: actions/cache@v5
+    - name: Check code formatting with ruff
+      run: ruff format --diff
+      continue-on-error: true
 
-
-    # - name: Install dependencies
-    #   run: |
-    #     conda env update --file environment.yml --name base
-    # - name: Lint with ruff
-    #   run: ruff check --output-format=github --target-version=py39
-    # - name: Check code formatting with Ruff
-    #   run: ruff format --diff --target-version=py39
-    #   continue-on-error: true
-    # - name: Test with pytest
-    #   run: |
-    #     conda install pytest
-    #     pytest tests/
+    - name: Test with pytest
+      run: pytest
