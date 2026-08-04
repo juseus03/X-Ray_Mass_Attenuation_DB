@@ -136,3 +136,6 @@ class Data:
             return None
 
         return mu[material][0]
+
+    def get_spectrum_list(self) -> list[str]:
+        return self.df_spectra.columns[1:]

@@ -16,7 +16,7 @@ This software lets you calculate and visualize two things:
 
 ## Installation
 
-Requires Python >= 3.11. With conda and the `environment.yml`:
+Requires Python >= 3.12. With conda and the `environment.yml`:
 
 ```bash
 conda env create -f environment.yml -p ./envs
