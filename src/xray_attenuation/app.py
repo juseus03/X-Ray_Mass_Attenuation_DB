@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import numpy as np
 from imgui_bundle import hello_imgui, imgui, immapp, implot
 
 from xray_attenuation import CLI
@@ -114,9 +113,10 @@ def gui_plot(app_sate: AppState):
 # =============================================================================
 def create_default_docking_splits() -> list[hello_imgui.DockingSplit]:
     # Define the default docking splits,
-    # i.e. the way the screen space is split in different target zones for the dockable windows
-    # We want to split "MainDockSpace" (which is provided automatically) into three zones, like this:
-    #
+    # i.e. the way the screen space is split in different target zones
+    # for the dockable windows
+    # We want to split "MainDockSpace" (which is provided automatically) into three
+    # zones like this:
     #    ___________________________________________
     #    |        |                                |
     #    | Command|                                |
@@ -129,13 +129,7 @@ def create_default_docking_splits() -> list[hello_imgui.DockingSplit]:
     #    -------------------------------------------
     #
 
-    # Uncomment the next line if you want to always start with this layout.
-    # Otherwise, modifications to the layout applied by the user layout will be remembered.
-    # runner_params.docking_params.layout_condition = (
-    #     hello_imgui.DockingLayoutCondition.application_start
-    # )
-
-    # Then, add a space named "MiscSpace" whose height is 25% of the app height.
+    # Add a space named "MiscSpace" whose height is 25% of the app height.
     # This will split the preexisting default dockspace "MainDockSpace" in two parts.
     split_main_misc = hello_imgui.DockingSplit()
     split_main_misc.initial_dock = "MainDockSpace"
@@ -143,12 +137,13 @@ def create_default_docking_splits() -> list[hello_imgui.DockingSplit]:
     split_main_misc.direction = imgui.Dir.down
     split_main_misc.ratio = 0.25
 
-    # Then, add a space to the left which occupies a column whose width is 25% of the app width
+    # Add a space to the left which occupies a column whose width
+    # is 30% of the app width
     split_main_command = hello_imgui.DockingSplit()
     split_main_command.initial_dock = "MainDockSpace"
     split_main_command.new_dock = "CommandSpace"
     split_main_command.direction = imgui.Dir.left
-    split_main_command.ratio = 0.25
+    split_main_command.ratio = 0.30
 
     splits = [split_main_misc, split_main_command]
     return splits
@@ -162,7 +157,7 @@ def create_dockable_windows(app_state: AppState) -> list[hello_imgui.DockableWin
     configurations_window.dock_space_name = "CommandSpace"
     configurations_window.gui_function = lambda: gui_commands(app_state)
 
-    # A Log window named "Logs" will be placed in "MiscSpace". It uses the HelloImGui logger gui
+    # A Log window named "Logs" will be placed in "MiscSpace"
     other_information_window = hello_imgui.DockableWindow()
     other_information_window.label = "Other Information"
     other_information_window.dock_space_name = "OtherInfoSPace"
@@ -216,7 +211,8 @@ def main():
 
     runner_params.imgui_window_params.enable_viewports = False
     runner_params.docking_params = create_default_layout(app_state)
-    # runner_params.ini_folder_type = hello_imgui.IniFolderType.app_user_config_folder # Use this for deployment
+    # Use this for deployment
+    # runner_params.ini_folder_type = hello_imgui.IniFolderType.app_user_config_folder
     runner_params.ini_folder_type = hello_imgui.IniFolderType.current_folder
     runner_params.ini_filename = "xray_attenuation/xray_attenuation.ini"
 
