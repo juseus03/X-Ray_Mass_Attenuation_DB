@@ -1,8 +1,20 @@
-from dataclasses import dataclass
+import logging
+import re
+from dataclasses import dataclass, field
 
+import numpy as np
 from imgui_bundle import hello_imgui, imgui, immapp, implot
 
-from xray_attenuation import CLI
+from xray_attenuation import CLI, Filter
+
+LOG_LEVEL = "DEBUG"
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL),
+    format="|%(asctime)s| (%(levelname)s) (%(name)s) - %(message)s",
+)
+logger.info("Logging level set to: %s", LOG_LEVEL)
 
 
 # =============================================================================
@@ -10,18 +22,40 @@ from xray_attenuation import CLI
 # =============================================================================
 @dataclass
 class AppState:
+    """Class for controlling the GUI"""
+
     version: str = "0.0.1"
     counter: int = 0
     f: float = 0.0
     cli: CLI = CLI()
 
     spectrum_list = cli.data.get_spectrum_list()
-    current_spectrum_idx = 0
+    current_spectrum_idx = 41
 
     material_list = cli.data.get_materials_list()
 
+    pattern = re.compile(r"\s*\([A-Z][a-z]?\)$")
+    filters: list[Filter] = field(default_factory=list[Filter])
+
     def get_current_base_spectrum(self):
         return self.spectrum_list[self.current_spectrum_idx]
+
+    def register_filter(self, name: str, thickness: float):
+
+        thickness = np.round(thickness, 5)
+        name = self.pattern.sub("", name)
+
+        n, is_compound = self.cli.get_single_material_name(name)
+        energy = float(self.get_current_base_spectrum())
+        self.cli.add_filter(n, energy, thickness, is_compound)
+
+        self.filters.append(Filter(name, thickness, is_compound))
+
+        logging.debug("Register filter: %s %s %s", n, thickness, is_compound)
+
+    def clean_filters_list(self):
+        self.filters = []
+        logging.debug("Cleaned filter list")
 
 
 # =============================================================================
@@ -33,7 +67,7 @@ def gui_commands(app_state: AppState):
     static = gui_commands
 
     if not hasattr(static, "material_idx"):
-        static.material_idx = 0
+        static.material_idx = 12
 
     if not hasattr(static, "thickness"):
         static.thickness = 0.1
@@ -55,8 +89,9 @@ def gui_commands(app_state: AppState):
                 imgui.set_item_default_focus()
         imgui.end_combo()
 
-    imgui.separator_text("Filters")
+    imgui.separator_text("Filter Configuration")
     materials = app_state.material_list
+
     if imgui.begin_combo("##filters", materials[static.material_idx]):
         for n, m in enumerate(materials):
             is_selected = static.material_idx == n
@@ -67,6 +102,8 @@ def gui_commands(app_state: AppState):
                 imgui.set_item_default_focus()
         imgui.end_combo()
 
+    cbx_size = imgui.get_item_rect_size()
+
     changed, static.thickness = imgui.input_float(
         "Thickness [cm]", static.thickness, 0.001, 0.1
     )
@@ -74,8 +111,18 @@ def gui_commands(app_state: AppState):
     if changed:
         static.thickness = static.thickness if static.thickness > 0 else 0
 
-    if imgui.button("+Add"):
-        print("clicked")
+    if imgui.button("+Add", imgui.ImVec2(cbx_size.x, 0)):
+        app_state.register_filter(materials[static.material_idx], static.thickness)
+
+    imgui.separator_text("Filters")
+
+    for i, f in enumerate(app_state.filters):
+        imgui.push_id(i)
+        imgui.align_text_to_frame_padding()
+        imgui.text(f"{f.name} - {f.thickness} cm")
+        imgui.same_line()
+        imgui.button("-", immapp.em_to_vec2(4, 0))
+        imgui.pop_id()
 
 
 def gui_plot(app_sate: AppState):
@@ -92,18 +139,31 @@ def gui_plot(app_sate: AppState):
     current_spectrum_lbl = app_sate.get_current_base_spectrum()
 
     if app_sate.cli.spectrum_df is None or static.base_energy != current_spectrum_lbl:
+        app_sate.clean_filters_list()
         app_sate.cli.add_base_spectrum(int(current_spectrum_lbl))
+        static.base_energy = app_sate.get_current_base_spectrum()
 
     energy = app_sate.cli.spectrum_df["Energy[keV]"].to_numpy().flatten()
-    intensity = app_sate.cli.spectrum_df[current_spectrum_lbl].to_numpy().flatten()
+
+    intensity_cols = app_sate.cli.spectrum_df.columns[1:]
 
     implot.begin_plot("Spectrum", immapp.em_to_vec2(41, 41))
-
     implot.setup_axes("Energy [keV]", "Intensity [a. u.]", 0, yflags)
     implot.setup_axis_scale(implot.ImAxis_.y1, implot.Scale_.log10)
     implot.setup_axes_limits(0, 100, static.ylimits[0], static.ylimits[1])
 
-    implot.plot_line("", energy, intensity)
+    for i, c in enumerate(intensity_cols):
+        intensity = app_sate.cli.spectrum_df[c].to_numpy().flatten()
+
+        if i == 0:
+            lbl = f"{c} kV"
+        else:
+            flt = app_sate.filters[i - 1]
+            lbl = f"+ {flt.name} {flt.thickness} cm"
+
+        imgui.push_id(i)
+        implot.plot_line(lbl, energy, intensity)
+        imgui.pop_id()
 
     implot.end_plot()
 

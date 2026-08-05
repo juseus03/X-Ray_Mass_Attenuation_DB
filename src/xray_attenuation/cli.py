@@ -304,6 +304,11 @@ class CLI:
         Args:
             energy (float): Maximum value of the energy spectrum in keV
         """
+
+        # Should clean the filters list the same way as it redoes the
+        # data frame
+        self.filters = []
+
         energy_column_name = str(int(np.round(energy, 0)))
 
         # Spectra exist only at integer kV, so anything else is snapped. np.round is
@@ -380,6 +385,23 @@ class CLI:
                 else:
                     print(f"Plot saved to: {path}")
 
+    def get_single_material_name(self, material_name: str) -> tuple[str, bool] | None:
+        """Interactive mode for getting the material name from the user
+
+        Args:
+            material_name (str): given material name from the user
+
+        Returns:
+            tuple[str, bool] | None: (canonical name, is_compound) if the material is in the
+                database, otherwise None
+        """
+        if material_name is None or material_name == "-":
+            name = self.ask_for_materials()
+        else:
+            name = material_name
+
+        return self.data.resolve_material_name(name)
+
 
 def _get_user_energy(cli: CLI, args: argparse.Namespace) -> float:
     """Interactive mode for getting the energy value from the user
@@ -400,25 +422,6 @@ def _get_user_energy(cli: CLI, args: argparse.Namespace) -> float:
         f"({cli.min_energy:.0f} keV - {cli.max_energy:.0f} keV)"
     )
     return cli.get_user_input("energy")
-
-
-def _get_single_material_name(cli: CLI, material_name: str) -> tuple[str, bool] | None:
-    """Interactive mode for getting the material name from the user
-
-    Args:
-        cli (CLI): cli object
-        material_name (str): given material name from the user
-
-    Returns:
-        tuple[str, bool] | None: (canonical name, is_compound) if the material is in the
-            database, otherwise None
-    """
-    if material_name is None or material_name == "-":
-        name = cli.ask_for_materials()
-    else:
-        name = material_name
-
-    return cli.data.resolve_material_name(name)
 
 
 def run_single_value(cli: CLI, args: argparse.Namespace) -> None:
@@ -506,7 +509,7 @@ def main() -> None:
 
     if len(args.material_name) == len(args.thickness):
         for m, t in zip(args.material_name, args.thickness, strict=True):
-            resolved = _get_single_material_name(cli, m)
+            resolved = cli.get_single_material_name(m)
             if resolved is None:
                 sys.stderr.write(f"Error: '{m}' is not in the database\n")
                 sys.exit(1)
@@ -515,7 +518,7 @@ def main() -> None:
     else:
         # Map n->m:
         for m in args.material_name:
-            resolved = _get_single_material_name(cli, m)
+            resolved = cli.get_single_material_name(m)
             if resolved is None:
                 sys.stderr.write(f"Error: '{m}' is not in the database\n")
                 sys.exit(1)
