@@ -228,12 +228,14 @@ def create_dockable_windows(app_state: AppState) -> list[hello_imgui.DockableWin
     configurations_window.label = "Configuration"
     configurations_window.dock_space_name = "CommandSpace"
     configurations_window.gui_function = lambda: gui_commands(app_state)
+    configurations_window.can_be_closed = False
 
     # A Log window named "Logs" will be placed in "MiscSpace"
     other_information_window = hello_imgui.DockableWindow()
     other_information_window.label = "Other Information"
     other_information_window.dock_space_name = "OtherInfoSPace"
     other_information_window.gui_function = hello_imgui.log_gui
+    other_information_window.can_be_closed = False
 
     # A window will be placed in "MainDockSpace"
     main_plot_window = hello_imgui.DockableWindow()
@@ -241,6 +243,7 @@ def create_dockable_windows(app_state: AppState) -> list[hello_imgui.DockableWin
     main_plot_window.dock_space_name = "MainDockSpace"
     main_plot_window.imgui_window_flags = imgui.WindowFlags_.menu_bar
     main_plot_window.gui_function = lambda: gui_plot(app_state)
+    main_plot_window.can_be_closed = False
 
     dockable_windows = [
         configurations_window,
