@@ -268,7 +268,7 @@ class CLI:
             pl.when(filtered_spectrum < 1e-35)
             .then(0)
             .otherwise(filtered_spectrum)
-            .alias(f"{len(self.filters)+1}_{pfilter.name}_{pfilter.thickness}cm")
+            .alias(f"{len(self.filters) + 1}_{pfilter.name}_{pfilter.thickness}cm")
         ).drop(pfilter.name)
 
     def remove_filter(self, filter_index: int) -> None:

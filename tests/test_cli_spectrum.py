@@ -38,7 +38,6 @@ def value_at(cli, column, energy=PROBE_KEV):
 
 
 class TestAddBaseSpectrum:
-
     def test_selects_the_requested_tube_voltage(self, cli):
         cli.add_base_spectrum(TUBE_KV)
 
@@ -69,7 +68,6 @@ class TestAddBaseSpectrum:
 
 
 class TestAddFilter:
-
     def test_single_filter_follows_beer_lambert(self, cli, shared_data):
         cli.add_base_spectrum(TUBE_KV)
         base = value_at(cli, "60")
@@ -162,7 +160,6 @@ def build_stack(cli, materials):
 
 
 class TestRemoveFilter:
-
     STACK = [("Aluminum", 0.1), ("Copper", 0.1), ("Iron", 0.1)]
 
     def test_removing_the_last_filter(self, cli):
@@ -216,7 +213,6 @@ class TestRemoveFilter:
 
 
 class TestPlotSpectra:
-
     def test_plots_one_line_per_spectrum_with_cumulative_labels(self, cli):
         build_stack(cli, [("Aluminum", 0.1), ("Copper", 0.2)])
 

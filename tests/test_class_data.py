@@ -5,7 +5,6 @@ from xray_attenuation.data import Data, MaterialNotFoundError
 
 
 class TestDataClass:
-
     data = Data()
 
     def test_elements_df(self):
