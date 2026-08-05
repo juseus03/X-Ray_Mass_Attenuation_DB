@@ -53,6 +53,16 @@ class AppState:
 
         logging.debug("Register filter: %s %s %s", n, thickness, is_compound)
 
+    def remove_filter(self, idx: int):
+
+        old_filter = self.filters[idx]
+        self.cli.remove_filter(idx)
+
+        self.filters.pop(idx)
+        logging.debug(
+            "Filter %s removed: %s - %s", idx, old_filter.name, old_filter.thickness
+        )
+
     def clean_filters_list(self):
         self.filters = []
         logging.debug("Cleaned filter list")
@@ -121,7 +131,9 @@ def gui_commands(app_state: AppState):
         imgui.align_text_to_frame_padding()
         imgui.text(f"{f.name} - {f.thickness} cm")
         imgui.same_line()
-        imgui.button("-", immapp.em_to_vec2(4, 0))
+        if imgui.button("-", immapp.em_to_vec2(4, 0)):
+            app_state.remove_filter(i)
+
         imgui.pop_id()
 
 

@@ -392,8 +392,8 @@ class CLI:
             material_name (str): given material name from the user
 
         Returns:
-            tuple[str, bool] | None: (canonical name, is_compound) if the material is in the
-                database, otherwise None
+            tuple[str, bool] | None: (canonical name, is_compound)
+            if the material is in the database, otherwise None
         """
         if material_name is None or material_name == "-":
             name = self.ask_for_materials()
