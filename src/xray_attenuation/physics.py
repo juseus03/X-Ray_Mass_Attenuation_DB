@@ -156,10 +156,15 @@ def get_effective_energy(
     """
 
     if hvl is None:
-        hvl = get_hvl(spectrum, mu) * 1e-1  # cm
+        hvl = get_hvl(spectrum, mu)  # mm
 
     mu_eff = np.log(2) / (hvl * 1e-1)
-    idx_high = int(np.argwhere(mu < mu_eff)[0][0])
-    if idx_high == len(mu):
-        return float(spectrum_bins[idx_high - 1])
-    return float((spectrum_bins[idx_high] + spectrum_bins[idx_high + 1]) * 0.5)
+
+    print(mu_eff)
+    print(hvl)
+
+    try:
+        idx_high = int(np.argwhere(mu < mu_eff)[0][0])
+        return float((spectrum_bins[idx_high] + spectrum_bins[idx_high - 1]) * 0.5)
+    except IndexError:
+        return float(spectrum_bins[-1])

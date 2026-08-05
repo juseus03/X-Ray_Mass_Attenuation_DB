@@ -158,6 +158,6 @@ def test_get_effective_energy(spectra_and_mu):
     hvl = 1.75
     eeff = get_effective_energy(spectrum, spectrum_bins, mu, hvl)
 
-    assert eeff == pytest.approx(27.35, abs=1e-3)
+    assert eeff == pytest.approx(27.25, abs=1e-3)
     eeff = get_effective_energy(spectrum, spectrum_bins, mu)
-    assert eeff == pytest.approx(4.25, abs=1e-3)
+    assert eeff == pytest.approx(9.35, abs=1e-3)
