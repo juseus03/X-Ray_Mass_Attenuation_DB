@@ -1,6 +1,6 @@
 # X-Ray Attenuation
 [![Tests](https://img.shields.io/github/actions/workflow/status/juseus03/X-Ray_Mass_Attenuation_DB/python-package-conda.yml?branch=main&label=Tests)](https://github.com/juseus03/X-Ray_Mass_Attenuation_DB/actions/workflows/python-package-conda.yml)
-
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 Software for calculation of the transmission coefficient for photons based on the NIST tables for X-rays Mass Attenuation Coefficients [1].
 
