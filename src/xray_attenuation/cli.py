@@ -434,7 +434,7 @@ class CLI:
         """Get mean energy of last spectrum
 
         Returns:
-            float | None: _description_
+            float | None: Mean energy in keV
         """
         if self.spectrum_df is None:
             return None
@@ -499,7 +499,7 @@ class CLI:
             Defaults to "Aluminum".
 
         Returns:
-            float | None: Effective energy
+            float | None: Effective energy in keV
         """
 
         arrays = self._aligned_arrays(material)
@@ -512,9 +512,7 @@ class CLI:
             if not hvl_mm:
                 return None
         except ValueError:
-            print(
-                f"ERROR: linear attenuation of {material} is zero in all the energy range"
-            )
+            print(f"ERROR: linear attenuation of {material} is always zero")
             return None
         return get_effective_energy(s0, bins, mu, hvl_mm)
 

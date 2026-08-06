@@ -2,10 +2,10 @@
 
 import logging
 import re
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 
 import numpy as np
-from icecream import ic
 from imgui_bundle import hello_imgui, imgui, immapp, implot
 
 from xray_attenuation import CLI, Filter
@@ -18,6 +18,62 @@ logging.basicConfig(
     format="|%(asctime)s| (%(levelname)s) (%(name)s) - %(message)s",
 )
 logger.info("Logging level set to: %s", LOG_LEVEL)
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+
+@dataclass
+class PhysicsQuantity:
+    """One derived quantity shown in the "Other Information" panel
+
+    Attributes:
+        label (str): display text
+        compute (Callable): Function for calculation through CLI
+        fmt (str): display format
+        plottable (bool):  "Show in plot" checkbox
+    """
+
+    label: str
+    compute: Callable[[CLI], float | None]
+    fmt: str = "{:.2f}"
+    plottable: bool = False
+    value: float = 0.0
+    show_in_plot: bool = False
+
+    def refresh(self, cli: CLI) -> None:
+        value = self.compute(cli)
+        self.value = value if value is not None else 0.0
+
+    @property
+    def text(self) -> str:
+        return self.fmt.format(self.value)
+
+
+def _make_physics_info() -> dict[str, PhysicsQuantity]:
+    """The panel contents, in display order."""
+    return {
+        "filtered_fraction": PhysicsQuantity(
+            "Total filtered photons (%)",
+            lambda cli: (
+                (1 - f) * 100
+                if (f := cli.get_total_filtered_fraction()) is not None
+                else None
+            ),
+        ),
+        "hvl": PhysicsQuantity("HVL [mm]", lambda cli: cli.get_hvl()),
+        "mean_energy": PhysicsQuantity(
+            "Mean energy [keV]",
+            lambda cli: cli.get_mean_energy_spectrum(),
+            plottable=True,
+        ),
+        "eeff": PhysicsQuantity(
+            "Effective Energy [keV]",
+            lambda cli: cli.get_effective_energy(),
+            plottable=True,
+        ),
+    }
 
 
 # =============================================================================
@@ -51,6 +107,8 @@ class AppState:
     material_list = cli.data.get_materials_list()
 
     pattern = re.compile(r"\s*\([A-Z][a-z]?\)$")
+
+    physics_info: dict[str, PhysicsQuantity] = field(default_factory=_make_physics_info)
 
     @property
     def filters(self) -> list[Filter]:
@@ -98,6 +156,8 @@ class AppState:
 
         logger.debug("Register filter: %s %s %s", n, thickness, is_compound)
 
+        self.update_phyics_info()
+
     def remove_filter(self, idx: int) -> None:
         """Removes one filter from the stack and recomputes the spectrum
 
@@ -115,6 +175,12 @@ class AppState:
         logger.debug(
             "Filter %s removed: %s - %s", idx, old_filter.name, old_filter.thickness
         )
+        self.update_phyics_info()
+
+    def update_phyics_info(self) -> None:
+        """Triggers the re-calculation of the physical information values"""
+        for quantity in self.physics_info.values():
+            quantity.refresh(self.cli)
 
 
 # =============================================================================
@@ -173,7 +239,7 @@ def gui_commands(app_state: AppState) -> None:
     cbx_size = imgui.get_item_rect_size()
 
     changed, static.thickness = imgui.input_float(
-        "Thickness [cm]", static.thickness, 0.001, 0.1
+        "Thickness [mm]", static.thickness, 0.001, 0.1
     )
 
     if changed:
@@ -183,7 +249,10 @@ def gui_commands(app_state: AppState) -> None:
         if static.thickness <= 0:
             logger.info("Filter thicknes %s <= 0 ", static.thickness)
         else:
-            app_state.register_filter(materials[static.material_idx], static.thickness)
+            # Thickness should be in cm when passed to the CLI
+            app_state.register_filter(
+                materials[static.material_idx], static.thickness * 1e-1
+            )
 
     imgui.separator_text("Filters")
 
@@ -233,10 +302,9 @@ def gui_plot(app_sate: AppState) -> None:
     current_spectrum_lbl = app_sate.get_current_base_spectrum()
 
     if app_sate.cli.spectrum_df is None or static.base_energy != current_spectrum_lbl:
-        # add_base_spectrum drops the filter stack itself, so cli.filters and the
-        # dataframe columns stay in step without the GUI clearing anything
         app_sate.cli.add_base_spectrum(int(current_spectrum_lbl))
         static.base_energy = app_sate.get_current_base_spectrum()
+        app_sate.update_phyics_info()
 
     energy = app_sate.cli.spectrum_df["Energy[keV]"].to_numpy().flatten()
 
@@ -262,6 +330,31 @@ def gui_plot(app_sate: AppState) -> None:
             imgui.pop_id()
 
         implot.end_plot()
+
+
+def gui_info(app_state: AppState) -> None:
+    """Renders spectrum information
+
+    Args:
+        app_state (AppState): Current application state
+    """
+    if imgui.begin_table("tbl2", 3):
+        for key, quantity in app_state.physics_info.items():
+            imgui.push_id(key)
+            imgui.table_next_row()
+            imgui.table_next_column()
+            imgui.text(quantity.label)
+            imgui.table_next_column()
+            imgui.text(quantity.text)
+
+            if quantity.plottable:
+                imgui.table_next_column()
+                _, quantity.show_in_plot = imgui.checkbox(
+                    "Show in plot", quantity.show_in_plot
+                )
+
+            imgui.pop_id()
+        imgui.end_table()
 
 
 # =============================================================================
@@ -331,7 +424,7 @@ def create_dockable_windows(app_state: AppState) -> list[hello_imgui.DockableWin
     other_information_window = hello_imgui.DockableWindow()
     other_information_window.label = "Other Information"
     other_information_window.dock_space_name = "OtherInfoSPace"
-    other_information_window.gui_function = hello_imgui.log_gui
+    other_information_window.gui_function = lambda: gui_info(app_state)
     other_information_window.can_be_closed = False
 
     main_plot_window = hello_imgui.DockableWindow()
