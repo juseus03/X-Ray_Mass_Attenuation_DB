@@ -474,14 +474,12 @@ class CLI:
         """Returns the HVL in "material" of the last added spectrum
 
         Args:
-            material (str, optional): Material for HVL calculation. Defaults to "Aluminum".
+            material (str, optional): Material for HVL calculation.
+            Defaults to "Aluminum".
 
         Returns:
             float | None: HVL in mm
         """
-        if self.spectrum_df is None:
-            return None
-
         try:
             arrays = self._aligned_arrays(material)
             if arrays is None:
@@ -489,16 +487,20 @@ class CLI:
             _, s0, mu = arrays
             return get_hvl(s0, mu)
 
-        except TypeError:
-            print(f"ERROR: {material} not in the DB")
-            return None
         except ValueError:
-            print(
-                f"ERROR: linear attenuation of {material} is zero in all the energy range"
-            )
+            print(f"ERROR: linear attenuation of {material} is always zero")
             return None
 
     def get_effective_energy(self, material: str = "Aluminum") -> float | None:
+        """Returns the effective nergy of the last added spectrum
+
+        Args:
+            material (str, optional): Material for HVL calculation.
+            Defaults to "Aluminum".
+
+        Returns:
+            float | None: Effective energy
+        """
 
         arrays = self._aligned_arrays(material)
         if arrays is None:
@@ -507,6 +509,8 @@ class CLI:
 
         try:
             hvl_mm = get_hvl(s0, mu)
+            if not hvl_mm:
+                return None
         except ValueError:
             print(
                 f"ERROR: linear attenuation of {material} is zero in all the energy range"
