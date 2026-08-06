@@ -31,7 +31,7 @@ class PhysicsQuantity:
     Attributes:
         name (str): display text without the unit, also the plot legend entry
         compute (Callable): Function for calculation through CLI
-        unit (str): unit including its own brackets, e.g. "[keV]" or "(%)"
+        unit (str): bare unit, rendered dimmed next to the value, e.g. "keV"
         fmt (str): display format
         show_in_plot (bool):  "Show in plot" checkbox
     """
@@ -48,11 +48,6 @@ class PhysicsQuantity:
         self.value = value if value is not None else 0.0
 
     @property
-    def label(self) -> str:
-        """Display text for the info table: the name followed by its unit"""
-        return f"{self.name} {self.unit}".strip()
-
-    @property
     def text(self) -> str:
         return self.fmt.format(self.value)
 
@@ -61,24 +56,26 @@ def _make_physics_info() -> dict[str, PhysicsQuantity]:
     """The panel contents, in display order."""
     return {
         "filtered_fraction": PhysicsQuantity(
-            "Total filtered photons",
+            "Photons removed",
             lambda cli: (
                 (1 - f) * 100
                 if (f := cli.get_total_filtered_fraction()) is not None
                 else None
             ),
-            unit="(%)",
+            unit="%",
         ),
-        "hvl": PhysicsQuantity("HVL", lambda cli: cli.get_hvl(), unit="(Al) [mm]"),
+        "hvl": PhysicsQuantity(
+            "Half-value layer", lambda cli: cli.get_hvl(), unit="mm Al"
+        ),
         "mean_energy": PhysicsQuantity(
             "Mean energy",
             lambda cli: cli.get_mean_energy_spectrum(),
-            unit="[keV]",
+            unit="keV",
         ),
         "eeff": PhysicsQuantity(
-            "Effective Energy",
+            "Effective energy",
             lambda cli: cli.get_effective_energy(),
-            unit="(Al) [keV]",
+            unit="keV",
         ),
     }
 
@@ -458,22 +455,56 @@ def gui_plot(app_state: AppState) -> None:
         implot.end_plot()
 
 
+def _gui_quantity_cell(quantity: PhysicsQuantity, value_width: float) -> None:
+    """Renders one quantity inside the current table cell
+
+    Lays out ``name`` flush left, then the unit and the value flush right. The value
+    keeps a fixed width so the unit does not shift when a value gains or loses a digit.
+
+    Args:
+        quantity (PhysicsQuantity): the quantity to render
+        value_width (float): reserved width for the value, in pixels
+    """
+    right = imgui.get_cursor_pos_x() + imgui.get_content_region_avail().x
+    spacing = imgui.get_style().item_spacing.x
+
+    imgui.text_unformatted(quantity.name)
+
+    imgui.same_line()
+    unit_width = imgui.calc_text_size(quantity.unit).x
+    imgui.set_cursor_pos_x(right - value_width - spacing - unit_width)
+    imgui.push_style_color(
+        imgui.Col_.text, imgui.get_style_color_vec4(imgui.Col_.text_disabled)
+    )
+    imgui.text_unformatted(quantity.unit)
+    imgui.pop_style_color()
+
+    imgui.same_line()
+    imgui.set_cursor_pos_x(right - imgui.calc_text_size(quantity.text).x)
+    imgui.text_unformatted(quantity.text)
+
+
 def gui_info(app_state: AppState) -> None:
-    """Renders spectrum information
+    """Renders the "Beam quality" panel as a 2x2 grid of quantities
 
     Args:
         app_state (AppState): Current application state
     """
-    if imgui.begin_table("tbl2", 2):
-        for key, quantity in app_state.physics_info.items():
-            imgui.push_id(key)
+    quantities = list(app_state.physics_info.values())
+    # Widest value the quantities can reach, so the columns never shift
+    value_width = imgui.calc_text_size("000.00").x
+
+    flags = imgui.TableFlags_.borders_inner_v | imgui.TableFlags_.borders_h
+
+    imgui.push_style_var(imgui.StyleVar_.cell_padding, immapp.em_to_vec2(0.6, 0.6))
+    if imgui.begin_table("tbl2", 2, flags):
+        for row in range(0, len(quantities), 2):
             imgui.table_next_row()
-            imgui.table_next_column()
-            imgui.text(quantity.label)
-            imgui.table_next_column()
-            imgui.text(quantity.text)
-            imgui.pop_id()
+            for quantity in quantities[row : row + 2]:
+                imgui.table_next_column()
+                _gui_quantity_cell(quantity, value_width)
         imgui.end_table()
+    imgui.pop_style_var()
 
 
 # =============================================================================
