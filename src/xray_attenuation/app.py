@@ -107,6 +107,9 @@ class AppState:
             database
         filters (list[Filter]): the active filter stack. A read-only view of
             ``cli.filters``; drives the filter panel and the plot labels
+        curve_colors (list[imgui.ImVec4]): the color ImPlot gave each spectrum curve,
+            in plot order — the unfiltered spectrum first, then one per filter.
+            Written by ``gui_plot``, read by ``gui_commands``
     """
 
     cli: CLI = CLI()
@@ -119,6 +122,8 @@ class AppState:
     pattern = re.compile(r"\s*\([A-Z][a-z]?\)$")
 
     physics_info: dict[str, PhysicsQuantity] = field(default_factory=_make_physics_info)
+
+    curve_colors: list[imgui.ImVec4] = field(default_factory=list)
 
     @property
     def filters(self) -> list[Filter]:
@@ -257,7 +262,7 @@ def gui_commands(app_state: AppState) -> None:
     )
 
     imgui.indent(txt_size)
-    imgui.text("W-anode, 150 um Be window")
+    imgui.text_disabled("W-anode, 150 um Be window")
     imgui.unindent(txt_size)
 
     imgui.separator_text("Add filter")
@@ -327,7 +332,14 @@ def gui_commands(app_state: AppState) -> None:
             imgui.push_id(i)
             imgui.table_next_row()
             imgui.table_next_column()
+            color = (
+                app_state.curve_colors[i + 1]
+                if i + 1 < len(app_state.curve_colors)
+                else imgui.ImVec4(0, 0, 0, 0)
+            )
+            implot.item_icon(color)
             imgui.align_text_to_frame_padding()
+            imgui.same_line()
             imgui.text_wrapped(f"{f.name}")
 
             imgui.table_next_column()
@@ -341,7 +353,7 @@ def gui_commands(app_state: AppState) -> None:
             imgui.pop_id()
         imgui.end_table()
 
-    imgui.text_disabled("Stack total")
+    imgui.text_disabled("Total")
     imgui.same_line()
     imgui.text_wrapped(app_state.get_total_filter_stack())
 
@@ -378,7 +390,7 @@ def gui_plot(app_sate: AppState) -> None:
     # One label per column: the base spectrum, then the cumulative filters. strict
     # asserts that correspondence rather than letting a curve be mislabelled
     labels = [f"{app_sate.cli.max_kv} kV"]
-    labels += [f"+ {f.name} {f.thickness} cm" for f in app_sate.filters]
+    labels += [f"+ {f.name} {f.thickness * 10:.3f} mm" for f in app_sate.filters]
 
     spec_fill = implot.Spec(flags=0, fill_alpha=0.25)
 
@@ -388,13 +400,19 @@ def gui_plot(app_sate: AppState) -> None:
         implot.setup_axes_limits(0, 100, static.ylimits[0], static.ylimits[1])
         implot.setup_legend(implot.Location_.north_east)
 
+        curve_colors = []
+
         for i, (lbl, c) in enumerate(zip(labels, intensity_cols, strict=True)):
             intensity = app_sate.cli.spectrum_df[c].to_numpy().flatten()
 
             imgui.push_id(i)
             implot.plot_line(lbl, energy, intensity, spec=implot.Spec(line_weight=3))
+            # plot_shaded reuses this item's id, so this is the color of both
+            curve_colors.append(implot.get_last_item_color())
             implot.plot_shaded(lbl, energy, intensity, spec=spec_fill)
             imgui.pop_id()
+
+        app_sate.curve_colors = curve_colors
 
         ylims = implot.get_plot_limits().y
         log_min, log_max = np.log10(ylims.min), np.log10(ylims.max)
