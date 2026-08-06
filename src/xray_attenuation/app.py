@@ -29,14 +29,16 @@ class PhysicsQuantity:
     """One derived quantity shown in the "Other Information" panel
 
     Attributes:
-        label (str): display text
+        name (str): display text without the unit, also the plot legend entry
         compute (Callable): Function for calculation through CLI
+        unit (str): unit including its own brackets, e.g. "[keV]" or "(%)"
         fmt (str): display format
         plottable (bool):  "Show in plot" checkbox
     """
 
-    label: str
+    name: str
     compute: Callable[[CLI], float | None]
+    unit: str = ""
     fmt: str = "{:.2f}"
     plottable: bool = False
     value: float = 0.0
@@ -47,6 +49,11 @@ class PhysicsQuantity:
         self.value = value if value is not None else 0.0
 
     @property
+    def label(self) -> str:
+        """Display text for the info table: the name followed by its unit"""
+        return f"{self.name} {self.unit}".strip()
+
+    @property
     def text(self) -> str:
         return self.fmt.format(self.value)
 
@@ -55,22 +62,25 @@ def _make_physics_info() -> dict[str, PhysicsQuantity]:
     """The panel contents, in display order."""
     return {
         "filtered_fraction": PhysicsQuantity(
-            "Total filtered photons (%)",
+            "Total filtered photons",
             lambda cli: (
                 (1 - f) * 100
                 if (f := cli.get_total_filtered_fraction()) is not None
                 else None
             ),
+            unit="(%)",
         ),
-        "hvl": PhysicsQuantity("HVL [mm]", lambda cli: cli.get_hvl()),
+        "hvl": PhysicsQuantity("HVL", lambda cli: cli.get_hvl(), unit="[mm]"),
         "mean_energy": PhysicsQuantity(
-            "Mean energy [keV]",
+            "Mean energy",
             lambda cli: cli.get_mean_energy_spectrum(),
+            unit="[keV]",
             plottable=True,
         ),
         "eeff": PhysicsQuantity(
-            "Effective Energy [keV]",
+            "Effective Energy",
             lambda cli: cli.get_effective_energy(),
+            unit="[keV]",
             plottable=True,
         ),
     }
@@ -294,7 +304,7 @@ def gui_plot(app_sate: AppState) -> None:
     if not hasattr(static, "base_energy"):
         static.base_energy = app_sate.get_current_base_spectrum()
 
-    if not hasattr(static, "limits"):
+    if not hasattr(static, "ylimits"):
         static.ylimits = [1e-10, 1e-5]
 
     yflags = implot.AxisFlags_.lock_max | implot.AxisFlags_.lock_min
@@ -328,6 +338,11 @@ def gui_plot(app_sate: AppState) -> None:
             imgui.push_id(i)
             implot.plot_line(lbl, energy, intensity)
             imgui.pop_id()
+
+        for quantity in app_sate.physics_info.values():
+            if not quantity.show_in_plot or not quantity.value:
+                continue
+            implot.plot_inf_lines(quantity.name, np.array([quantity.value]))
 
         implot.end_plot()
 
