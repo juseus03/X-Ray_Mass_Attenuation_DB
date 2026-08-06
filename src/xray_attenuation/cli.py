@@ -8,9 +8,17 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
+from numpy.typing import NDArray
 
 from xray_attenuation.data import Data
-from xray_attenuation.physics import calculate_filtered_spectrum, get_transmission
+from xray_attenuation.physics import (
+    calculate_filtered_spectrum,
+    calculate_total_filtered_fraction,
+    get_effective_energy,
+    get_hvl,
+    get_mean_energy_spectrum,
+    get_transmission,
+)
 
 DATA_PATH = Path(__file__).parent / "data"
 TMP_PATH = Path(tempfile.gettempdir())
@@ -401,6 +409,110 @@ class CLI:
             name = material_name
 
         return self.data.resolve_material_name(name)
+
+    def get_total_filtered_fraction(self) -> float | None:
+        """Returns the total filtered fraction of the last added spectrum
+        against the unfiltered spectrum
+
+        Returns:
+            float | None: Fractional value
+        """
+        if self.spectrum_df is None:
+            return None
+
+        if self.spectrum_df.shape[1] < 3:
+            return None
+
+        columns = self.spectrum_df.columns
+
+        s0 = self.spectrum_df[self.max_kv].to_numpy().flatten()
+        s1 = self.spectrum_df[columns[-1]].to_numpy().flatten()
+
+        return calculate_total_filtered_fraction(s0, s1)
+
+    def get_mean_energy_spectrum(self) -> float | None:
+        """Get mean energy of last spectrum
+
+        Returns:
+            float | None: _description_
+        """
+        if self.spectrum_df is None:
+            return None
+
+        columns = self.spectrum_df.columns
+        bins = self.spectrum_df[columns[0]].to_numpy().flatten()
+        s0 = self.spectrum_df[columns[-1]].to_numpy().flatten()
+
+        return get_mean_energy_spectrum(s0, bins)
+
+    def _aligned_arrays(
+        self, material: str
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]] | None:
+        """(bins, spectrum, mu) for `material`, all on the same joined energy grid."""
+        if self.spectrum_df is None:
+            return None
+
+        resolved = self.get_single_material_name(material)
+        if resolved is None:
+            print(f"ERROR: {material} not in the DB")
+            return None
+        mname, is_compound = resolved
+
+        mu_curve = self.data.get_linear_attenuation_curve(mname, is_compound)
+        df = self.spectrum_df.join(
+            mu_curve, left_on="Energy[keV]", right_on="Energy", validate="1:1"
+        )
+        cols = df.columns
+
+        return (
+            df["Energy[keV]"].to_numpy(),
+            df[cols[-2]].to_numpy(),
+            df[mname].to_numpy(),
+        )
+
+    def get_hvl(self, material: str = "Aluminum") -> float | None:
+        """Returns the HVL in "material" of the last added spectrum
+
+        Args:
+            material (str, optional): Material for HVL calculation. Defaults to "Aluminum".
+
+        Returns:
+            float | None: HVL in mm
+        """
+        if self.spectrum_df is None:
+            return None
+
+        try:
+            arrays = self._aligned_arrays(material)
+            if arrays is None:
+                return None
+            _, s0, mu = arrays
+            return get_hvl(s0, mu)
+
+        except TypeError:
+            print(f"ERROR: {material} not in the DB")
+            return None
+        except ValueError:
+            print(
+                f"ERROR: linear attenuation of {material} is zero in all the energy range"
+            )
+            return None
+
+    def get_effective_energy(self, material: str = "Aluminum") -> float | None:
+
+        arrays = self._aligned_arrays(material)
+        if arrays is None:
+            return None
+        bins, s0, mu = arrays
+
+        try:
+            hvl_mm = get_hvl(s0, mu)
+        except ValueError:
+            print(
+                f"ERROR: linear attenuation of {material} is zero in all the energy range"
+            )
+            return None
+        return get_effective_energy(s0, bins, mu, hvl_mm)
 
 
 def _get_user_energy(cli: CLI, args: argparse.Namespace) -> float:

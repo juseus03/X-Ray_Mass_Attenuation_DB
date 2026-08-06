@@ -268,3 +268,80 @@ class TestPlotSpectra:
         written = list(tmp_path.glob("*.png"))
         assert len(written) == 1
         assert written[0].stat().st_size > 0
+
+
+class TestPhysicsMetrics:
+    def test_total_filtered_franction(self, cli):
+
+        assert cli.get_total_filtered_fraction() is None
+
+        cli.add_base_spectrum(TUBE_KV)
+
+        cli.spectrum_df = cli.spectrum_df.with_columns(
+            (pl.col(str(TUBE_KV)) * 0.5).alias("frac")
+        )
+        assert cli.get_total_filtered_fraction() == pytest.approx(0.5, abs=1e-5)
+
+        cli.spectrum_df = cli.spectrum_df.with_columns(
+            (pl.col(str(TUBE_KV)) * 0.1).alias("frac")
+        )
+        assert cli.get_total_filtered_fraction() == pytest.approx(0.1, abs=1e-5)
+
+        cli.spectrum_df = cli.spectrum_df.with_columns(
+            (pl.col(str(TUBE_KV)) * 0.8).alias("frac")
+        )
+        assert cli.get_total_filtered_fraction() == pytest.approx(0.8, abs=1e-5)
+
+        cli.spectrum_df = cli.spectrum_df.with_columns(
+            (pl.col(str(TUBE_KV)) * 0.8).alias("frac")
+        )
+        assert cli.get_total_filtered_fraction() == pytest.approx(0.8, abs=1e-5)
+
+        with pytest.raises(ValueError):
+            cli.spectrum_df = cli.spectrum_df.with_columns(
+                (pl.col(str(TUBE_KV)) * 1.8).alias("frac")
+            )
+            cli.get_total_filtered_fraction()
+
+    def test_mean_energy_spectrum(self, cli):
+
+        assert cli.get_mean_energy_spectrum() is None
+
+        voltages = [50, 60, 70, 80, 90, 100]
+        answ = []
+
+        for v in voltages:
+            cli.add_base_spectrum(v)
+            answ.append(cli.get_mean_energy_spectrum())
+
+        assert all(f > 0 for f in answ)
+        assert all(v > f for f, v in zip(answ, voltages, strict=True))
+        assert answ == sorted(answ)
+
+    def test_get_hvl(self, cli):
+        assert cli.get_hvl() is None
+
+        cli.add_base_spectrum(TUBE_KV)
+        hvl = cli.get_hvl()
+
+        cli.add_filter("Aluminum", TUBE_KV, hvl * 1e-1, False)
+        frac = cli.get_total_filtered_fraction()
+
+        assert frac == pytest.approx(0.5, abs=1e-4)
+
+    def test_get_effective_energy(self, cli):
+
+        assert cli.get_effective_energy() is None
+
+        cli.add_base_spectrum(TUBE_KV)
+        answ = []
+
+        answ.append(cli.get_effective_energy())
+
+        cli.add_filter("Aluminum", TUBE_KV, 0.1, False)
+        answ.append(cli.get_effective_energy())
+
+        cli.add_filter("Aluminum", TUBE_KV, 0.1, False)
+        answ.append(cli.get_effective_energy())
+
+        assert answ == sorted(answ)

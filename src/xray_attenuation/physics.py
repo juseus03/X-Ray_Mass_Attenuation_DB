@@ -108,8 +108,7 @@ def get_hvl(
         float: HVL in mm. 0.0 for an empty spectrum
 
     Raises:
-        ValueError: if the beam is not halved anywhere below t_max,
-        which happens when mu is zero or negative over the whole spectrum
+        ValueError: if the mu is zero
     """
 
     i0 = np.sum(spectrum)
@@ -159,10 +158,6 @@ def get_effective_energy(
         hvl = get_hvl(spectrum, mu)  # mm
 
     mu_eff = np.log(2) / (hvl * 1e-1)
-
-    print(mu_eff)
-    print(hvl)
-
     try:
         idx_high = int(np.argwhere(mu < mu_eff)[0][0])
         return float((spectrum_bins[idx_high] + spectrum_bins[idx_high - 1]) * 0.5)
