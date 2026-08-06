@@ -152,3 +152,11 @@ class Data:
         compound_names = self.df_compounds_names["Material"].to_list()
         materials += compound_names
         return materials
+
+    def get_material_symbol(self, material: str) -> str:
+
+        series = self.df_elements_names.filter(pl.col("Element") == material)["Symbol"]
+        if series.shape[0] > 0:
+            return series[0]
+        else:
+            return ""

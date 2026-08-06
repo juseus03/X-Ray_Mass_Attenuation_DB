@@ -70,7 +70,7 @@ def _make_physics_info() -> dict[str, PhysicsQuantity]:
             ),
             unit="(%)",
         ),
-        "hvl": PhysicsQuantity("HVL", lambda cli: cli.get_hvl(), unit="[mm]"),
+        "hvl": PhysicsQuantity("HVL", lambda cli: cli.get_hvl(), unit="(Al) [mm]"),
         "mean_energy": PhysicsQuantity(
             "Mean energy",
             lambda cli: cli.get_mean_energy_spectrum(),
@@ -80,7 +80,7 @@ def _make_physics_info() -> dict[str, PhysicsQuantity]:
         "eeff": PhysicsQuantity(
             "Effective Energy",
             lambda cli: cli.get_effective_energy(),
-            unit="[keV]",
+            unit="(Al) [keV]",
             plottable=True,
         ),
     }
@@ -192,6 +192,30 @@ class AppState:
         for quantity in self.physics_info.values():
             quantity.refresh(self.cli)
 
+    def get_total_filter_stack(self) -> str:
+
+        answ = ""
+
+        # material:thickness dic
+        added = {}
+
+        for f in self.filters:
+            symbol = self.cli.data.get_material_symbol(f.name)
+            symbol = f.name if symbol == "" else symbol
+
+            if added.get(symbol) is None:
+                added[symbol] = f.thickness * 10
+            else:
+                added[symbol] += f.thickness * 10
+
+        for key, val in added.items():
+            if answ == "":
+                answ = f"{val:.3f} mm {key}"
+            else:
+                answ += f" + {val:.3f} mm {key}"
+
+        return answ
+
 
 # =============================================================================
 # GUI Functions
@@ -216,25 +240,37 @@ def gui_commands(app_state: AppState) -> None:
     if not hasattr(static, "thickness"):
         static.thickness = 0.1
 
-    imgui.separator_text("Spectrum")
-    imgui.text("Energy")
+    imgui.separator_text("Source")
+
+    imgui.text("Tube voltage")
+    txt_size = imgui.get_item_rect_size().x + 10
+
     imgui.same_line()
 
-    items = app_state.spectrum_list
-    combo_preview_value = items[app_state.current_spectrum_idx]
+    slider_value = app_state.spectrum_list[app_state.current_spectrum_idx]
+    changed, app_state.current_spectrum_idx = imgui.slider_int(
+        "kV",
+        app_state.current_spectrum_idx,
+        0,
+        len(app_state.spectrum_list) - 1,
+        slider_value,
+    )
 
-    if imgui.begin_combo("keV", combo_preview_value):
-        for n in range(len(app_state.spectrum_list)):
-            is_selected = app_state.current_spectrum_idx == n
-            _, is_selected = imgui.selectable(items[n], is_selected)
-            if is_selected:
-                app_state.current_spectrum_idx = n
-            if is_selected:
-                imgui.set_item_default_focus()
-        imgui.end_combo()
+    imgui.indent(txt_size)
+    imgui.text("W-anode, 150 um Be window")
+    imgui.unindent(txt_size)
 
-    imgui.separator_text("Filter Configuration")
+    imgui.separator_text("Add filter")
     materials = app_state.material_list
+
+    avail_w = imgui.get_content_region_avail().x
+    widget_w = int(avail_w / 4.5)
+
+    imgui.align_text_to_frame_padding()
+    imgui.text("Material")
+    imgui.same_line()
+
+    imgui.indent(widget_w)
 
     if imgui.begin_combo("##filters", materials[static.material_idx]):
         for n, m in enumerate(materials):
@@ -245,17 +281,22 @@ def gui_commands(app_state: AppState) -> None:
             if is_selected:
                 imgui.set_item_default_focus()
         imgui.end_combo()
+    imgui.unindent(widget_w)
 
     cbx_size = imgui.get_item_rect_size()
 
-    changed, static.thickness = imgui.input_float(
-        "Thickness [mm]", static.thickness, 0.001, 0.1
-    )
+    imgui.align_text_to_frame_padding()
+    imgui.text("Thickness")
+    imgui.same_line()
+
+    imgui.indent(widget_w)
+
+    changed, static.thickness = imgui.input_float("[mm]", static.thickness, 0.001, 0.1)
 
     if changed:
         static.thickness = static.thickness if static.thickness > 0 else 0.001
 
-    if imgui.button("+Add", imgui.ImVec2(cbx_size.x, 0)):
+    if imgui.button("Add to stack", imgui.ImVec2(cbx_size.x, 0)):
         if static.thickness <= 0:
             logger.info("Filter thicknes %s <= 0 ", static.thickness)
         else:
@@ -264,31 +305,45 @@ def gui_commands(app_state: AppState) -> None:
                 materials[static.material_idx], static.thickness * 1e-1
             )
 
-    imgui.separator_text("Filters")
+    imgui.unindent(widget_w)
+
+    imgui.separator_text("Filter stack")
 
     # Table layout for better organization and indent
 
     width = imgui.get_content_region_avail().x
-    btn_size = immapp.em_to_vec2(4, 0) * 2
-    first_col_width = width - btn_size.x
 
-    if imgui.begin_table("tbl1", 2):
+    tbl_flags = imgui.TableFlags_.borders_outer
+
+    if imgui.begin_table("tbl1", 3, tbl_flags):
         imgui.table_setup_column(
-            "name", imgui.TableColumnFlags_.width_fixed, first_col_width
+            "Material", imgui.TableColumnFlags_.width_fixed, width * 0.6
         )
+        imgui.table_setup_column(
+            "Thickness", imgui.TableColumnFlags_.width_fixed, width * 0.2
+        )
+        imgui.table_headers_row()
         for i, f in enumerate(app_state.filters):
             imgui.push_id(i)
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
-            imgui.text_wrapped(f"{f.name} - {f.thickness} cm")
+            imgui.text_wrapped(f"{f.name}")
+
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
+            imgui.text_wrapped(f"{f.thickness * 10:.2f} mm")
+
+            imgui.table_next_column()
             # Button fills the full space
             if imgui.button("-", immapp.em_to_vec2(-1, 0)):
                 app_state.remove_filter(i)
             imgui.pop_id()
         imgui.end_table()
+
+    imgui.text_disabled("Stack total")
+    imgui.same_line()
+    imgui.text_wrapped(app_state.get_total_filter_stack())
 
 
 def gui_plot(app_sate: AppState) -> None:
@@ -325,24 +380,49 @@ def gui_plot(app_sate: AppState) -> None:
     labels = [f"{app_sate.cli.max_kv} kV"]
     labels += [f"+ {f.name} {f.thickness} cm" for f in app_sate.filters]
 
-    # end_plot must only be called when begin_plot returned True, otherwise ImPlot
-    # asserts on the mismatch. begin_plot returns False when the plot is clipped
-    if implot.begin_plot("Spectrum", immapp.em_to_vec2(41, 41)):
-        implot.setup_axes("Energy [keV]", "Intensity [a. u.]", 0, yflags)
+    spec_fill = implot.Spec(flags=0, fill_alpha=0.25)
+
+    if implot.begin_plot("Spectrum", imgui.ImVec2(-1, -1)):
+        implot.setup_axes("Photon energy [keV]", "Intensity [a. u.]", 0, yflags)
         implot.setup_axis_scale(implot.ImAxis_.y1, implot.Scale_.log10)
         implot.setup_axes_limits(0, 100, static.ylimits[0], static.ylimits[1])
+        implot.setup_legend(implot.Location_.north_east)
 
         for i, (lbl, c) in enumerate(zip(labels, intensity_cols, strict=True)):
             intensity = app_sate.cli.spectrum_df[c].to_numpy().flatten()
 
             imgui.push_id(i)
-            implot.plot_line(lbl, energy, intensity)
+            implot.plot_line(lbl, energy, intensity, spec=implot.Spec(line_weight=3))
+            implot.plot_shaded(lbl, energy, intensity, spec=spec_fill)
             imgui.pop_id()
 
-        for quantity in app_sate.physics_info.values():
-            if not quantity.show_in_plot or not quantity.value:
-                continue
-            implot.plot_inf_lines(quantity.name, np.array([quantity.value]))
+        ylims = implot.get_plot_limits().y
+        log_min, log_max = np.log10(ylims.min), np.log10(ylims.max)
+        # 90% of the visible height. The axis is log-scaled, so the fraction is taken
+        # in log space rather than as 0.9 * ymax
+        y_annotation = 10 ** (log_min + 0.93 * (log_max - log_min))
+        line_height = imgui.get_text_line_height_with_spacing()
+
+        markers = [
+            q for q in app_sate.physics_info.values() if q.show_in_plot and q.value
+        ]
+
+        for i, quantity in enumerate(markers):
+            implot.plot_inf_lines(
+                quantity.name,
+                np.array([quantity.value]),
+                spec=implot.Spec(flags=implot.ItemFlags_.no_legend, line_weight=2),
+            )
+            # The markers land close together on a filtered spectrum, so each label
+            # drops one text line below the previous one
+            implot.annotation(
+                quantity.value,
+                y_annotation,
+                implot.get_last_item_color(),
+                imgui.ImVec2(+15, 15 + i * 2 * line_height),
+                False,
+                quantity.name,
+            )
 
         implot.end_plot()
 
@@ -437,7 +517,7 @@ def create_dockable_windows(app_state: AppState) -> list[hello_imgui.DockableWin
     configurations_window.can_be_closed = False
 
     other_information_window = hello_imgui.DockableWindow()
-    other_information_window.label = "Other Information"
+    other_information_window.label = "Beam quality"
     other_information_window.dock_space_name = "OtherInfoSPace"
     other_information_window.gui_function = lambda: gui_info(app_state)
     other_information_window.can_be_closed = False
