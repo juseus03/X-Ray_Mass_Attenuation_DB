@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 
 import numpy as np
+from icecream import ic
 from imgui_bundle import hello_imgui, imgui, immapp, implot
 
 from xray_attenuation import CLI, Filter
@@ -186,15 +187,29 @@ def gui_commands(app_state: AppState) -> None:
 
     imgui.separator_text("Filters")
 
-    for i, f in enumerate(app_state.filters):
-        imgui.push_id(i)
-        imgui.align_text_to_frame_padding()
-        imgui.text(f"{f.name} - {f.thickness} cm")
-        imgui.same_line()
-        if imgui.button("-", immapp.em_to_vec2(4, 0)):
-            app_state.remove_filter(i)
+    # Table layout for better organization and indent
 
-        imgui.pop_id()
+    width = imgui.get_content_region_avail().x
+    btn_size = immapp.em_to_vec2(4, 0) * 2
+    first_col_width = width - btn_size.x
+
+    if imgui.begin_table("tbl1", 2):
+        imgui.table_setup_column(
+            "name", imgui.TableColumnFlags_.width_fixed, first_col_width
+        )
+        for i, f in enumerate(app_state.filters):
+            imgui.push_id(i)
+            imgui.table_next_row()
+            imgui.table_next_column()
+            imgui.align_text_to_frame_padding()
+            imgui.text_wrapped(f"{f.name} - {f.thickness} cm")
+            imgui.table_next_column()
+            imgui.align_text_to_frame_padding()
+            # Button fills the full space
+            if imgui.button("-", immapp.em_to_vec2(-1, 0)):
+                app_state.remove_filter(i)
+            imgui.pop_id()
+        imgui.end_table()
 
 
 def gui_plot(app_sate: AppState) -> None:
