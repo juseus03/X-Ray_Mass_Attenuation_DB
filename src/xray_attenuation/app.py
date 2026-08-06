@@ -33,14 +33,13 @@ class PhysicsQuantity:
         compute (Callable): Function for calculation through CLI
         unit (str): unit including its own brackets, e.g. "[keV]" or "(%)"
         fmt (str): display format
-        plottable (bool):  "Show in plot" checkbox
+        show_in_plot (bool):  "Show in plot" checkbox
     """
 
     name: str
     compute: Callable[[CLI], float | None]
     unit: str = ""
     fmt: str = "{:.2f}"
-    plottable: bool = False
     value: float = 0.0
     show_in_plot: bool = False
 
@@ -75,13 +74,11 @@ def _make_physics_info() -> dict[str, PhysicsQuantity]:
             "Mean energy",
             lambda cli: cli.get_mean_energy_spectrum(),
             unit="[keV]",
-            plottable=True,
         ),
         "eeff": PhysicsQuantity(
             "Effective Energy",
             lambda cli: cli.get_effective_energy(),
             unit="(Al) [keV]",
-            plottable=True,
         ),
     }
 
@@ -358,39 +355,55 @@ def gui_commands(app_state: AppState) -> None:
     imgui.text_wrapped(app_state.get_total_filter_stack())
 
 
-def gui_plot(app_sate: AppState) -> None:
+def gui_plot(app_state: AppState) -> None:
     """Renders the "Plot" panel
 
     Draws a log-Y ImPlot of the unfiltered base spectrum plus one curve per filter.
 
     Args:
-        app_sate (AppState): the GUI state to read and mutate
+        app_state (AppState): the GUI state to read and mutate
     """
     static = gui_plot
 
     if not hasattr(static, "base_energy"):
-        static.base_energy = app_sate.get_current_base_spectrum()
+        static.base_energy = app_state.get_current_base_spectrum()
 
     if not hasattr(static, "ylimits"):
         static.ylimits = [1e-10, 1e-5]
 
+    ## Plot checkboxes
+    current_info = app_state.physics_info["mean_energy"]
+    _, current_info.show_in_plot = imgui.checkbox(
+        current_info.name, current_info.show_in_plot
+    )
+    imgui.same_line()
+    imgui.indent(immapp.em_to_vec2(10, 0).x)
+
+    current_info = app_state.physics_info["eeff"]
+    _, current_info.show_in_plot = imgui.checkbox(
+        current_info.name, current_info.show_in_plot
+    )
+    imgui.unindent(immapp.em_to_vec2(10, 0).x)
+
+    ## Spectra plot
+
     yflags = implot.AxisFlags_.lock_max | implot.AxisFlags_.lock_min
 
-    current_spectrum_lbl = app_sate.get_current_base_spectrum()
+    current_spectrum_lbl = app_state.get_current_base_spectrum()
 
-    if app_sate.cli.spectrum_df is None or static.base_energy != current_spectrum_lbl:
-        app_sate.cli.add_base_spectrum(int(current_spectrum_lbl))
-        static.base_energy = app_sate.get_current_base_spectrum()
-        app_sate.update_phyics_info()
+    if app_state.cli.spectrum_df is None or static.base_energy != current_spectrum_lbl:
+        app_state.cli.add_base_spectrum(int(current_spectrum_lbl))
+        static.base_energy = app_state.get_current_base_spectrum()
+        app_state.update_phyics_info()
 
-    energy = app_sate.cli.spectrum_df["Energy[keV]"].to_numpy().flatten()
+    energy = app_state.cli.spectrum_df["Energy[keV]"].to_numpy().flatten()
 
-    intensity_cols = app_sate.cli.spectrum_df.columns[1:]
+    intensity_cols = app_state.cli.spectrum_df.columns[1:]
 
     # One label per column: the base spectrum, then the cumulative filters. strict
     # asserts that correspondence rather than letting a curve be mislabelled
-    labels = [f"{app_sate.cli.max_kv} kV"]
-    labels += [f"+ {f.name} {f.thickness * 10:.3f} mm" for f in app_sate.filters]
+    labels = [f"{app_state.cli.max_kv} kV"]
+    labels += [f"+ {f.name} {f.thickness * 10:.3f} mm" for f in app_state.filters]
 
     spec_fill = implot.Spec(flags=0, fill_alpha=0.25)
 
@@ -403,7 +416,7 @@ def gui_plot(app_sate: AppState) -> None:
         curve_colors = []
 
         for i, (lbl, c) in enumerate(zip(labels, intensity_cols, strict=True)):
-            intensity = app_sate.cli.spectrum_df[c].to_numpy().flatten()
+            intensity = app_state.cli.spectrum_df[c].to_numpy().flatten()
 
             imgui.push_id(i)
             implot.plot_line(lbl, energy, intensity, spec=implot.Spec(line_weight=3))
@@ -412,7 +425,7 @@ def gui_plot(app_sate: AppState) -> None:
             implot.plot_shaded(lbl, energy, intensity, spec=spec_fill)
             imgui.pop_id()
 
-        app_sate.curve_colors = curve_colors
+        app_state.curve_colors = curve_colors
 
         ylims = implot.get_plot_limits().y
         log_min, log_max = np.log10(ylims.min), np.log10(ylims.max)
@@ -422,7 +435,7 @@ def gui_plot(app_sate: AppState) -> None:
         line_height = imgui.get_text_line_height_with_spacing()
 
         markers = [
-            q for q in app_sate.physics_info.values() if q.show_in_plot and q.value
+            q for q in app_state.physics_info.values() if q.show_in_plot and q.value
         ]
 
         for i, quantity in enumerate(markers):
@@ -451,7 +464,7 @@ def gui_info(app_state: AppState) -> None:
     Args:
         app_state (AppState): Current application state
     """
-    if imgui.begin_table("tbl2", 3):
+    if imgui.begin_table("tbl2", 2):
         for key, quantity in app_state.physics_info.items():
             imgui.push_id(key)
             imgui.table_next_row()
@@ -459,13 +472,6 @@ def gui_info(app_state: AppState) -> None:
             imgui.text(quantity.label)
             imgui.table_next_column()
             imgui.text(quantity.text)
-
-            if quantity.plottable:
-                imgui.table_next_column()
-                _, quantity.show_in_plot = imgui.checkbox(
-                    "Show in plot", quantity.show_in_plot
-                )
-
             imgui.pop_id()
         imgui.end_table()
 
