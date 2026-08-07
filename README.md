@@ -68,7 +68,7 @@ Filters stack, so this plots three curves: the bare 100 kV spectrum, the spectru
 `-s` / `--save-plot` also writes the figure as a .png in the OS designated temporal folder (`/tmp/` for Linux).
  
 ![100 kV W-spectrum filtered by 1 mm Al and 1 mm CdTe](docs/images/example_spectrum.png)
- 
+
 #### Options
  
 | Option | Meaning |
@@ -89,9 +89,13 @@ This starts the interactive GUI, built with Dear ImGui Bundle [2]:
 ```bash
 xray-attenuation-gui
 ```
+**Note:** the *Download* button opens a native file dialog. On Linux the dialog may not appear at all, which means `zenity` or `kdialog` is not installed.
+
 ![GUI: 90 kV W-spectrum filtered by 0.14 mm Al, 0.2 mm Pb, and 10 mm Soft Tissue](docs/images/example_GUI.png)
  
-**Note:** the *Download* button opens a native file dialog. On Linux the dialog may not appear at all, which means `zenity` or `kdialog` is not installed.
+![GUI Usage](docs/gifs/GUI_Usage.gif)
+
+![GUI Restore original view](docs/gifs/GUI_restore_view.gif) 
  
 ## Other information
 ### List of materials
