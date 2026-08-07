@@ -4,219 +4,137 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-X-Ray Mass Attenuation Database - Software for calculating X-ray transmission coefficients through NIST materials (elements and compounds). The project includes:
-- A Streamlit web application for interactive visualization
-- Command-line tools for transmission calculations
-- Data processing scripts for organizing X-ray spectra
+Computes photon transmission through matter (Beer-Lambert, `I = I0 * exp(-mu * t)`) from the NIST
+X-ray mass attenuation tables. It ships two front ends over one calculation core: an `argparse`
+CLI (`xray-transmission`) and a Dear ImGui / hello_imgui desktop GUI (`xray-transmission-gui`).
 
-## Project Layout
+## Commands
 
-The package is a PEP 621 / hatchling project using the `src/` layout:
-
-```
-pyproject.toml                 # single source of truth for deps + console script
-src/xray_attenuation/          # the installed package
-├── __init__.py                # exports Data, __version__
-├── cli.py                     # argparse CLI (entry point: xray-transmission)
-├── data.py                    # Data class: all loading + lookup
-├── physics.py                 # Beer-Lambert: get_transmission, calculate_filtered_spectrum
-└── data/                      # NIST tables, shipped inside the wheel
-scripts/organize_spectra.py    # one-off preprocessing, NOT installed
-tests/                         # pytest suite, NOT installed
-code/                          # pre-restructure copy (Streamlit app); superseded
-```
-
-`code/` is the old, pre-restructure copy. It is excluded from ruff and is not part of the
-package. Do not add features there.
-
-## Running the Application
-
-**Command-line Interface** (after `pip install -e .`):
-```bash
-xray-transmission -m Al -t 0.1 -e 30
-```
-- `-m/--material_name`: element symbol (`Al`), element name (`Aluminum`), or compound name;
-  use `-` or omit to get an interactive material list
-- `-t/--thickness`: thickness in cm
-- `-e/--energy`: photon energy in keV (3-200)
-- `-f/--full-spectrum`: filter a whole tungsten spectrum instead of a single energy. `-m` and
-  `-t` then accept several values (one filter each, or every material × every thickness), `-e`
-  becomes the tube voltage (9-100 kV), and the result is plotted
-- `-s/--save_plot`: also write the plot as a PNG into the system temp directory and print the
-  path. Full-spectrum mode only; the interactive window still opens
-- In single-value mode any omitted argument is prompted for interactively. Full-spectrum mode
-  only prompts for the energy — see *Intentional Design Decisions* below
-
-**Web Interface (Streamlit):** still the un-ported `code/app.py`
-(`streamlit run code/app.py`). The GUI is being moved off Streamlit, so streamlit/plotly are
-deliberately *not* declared in `pyproject.toml`.
-
-## Environment Setup
-
-`pyproject.toml` is the only dependency spec. `environment.yml` is a thin conda bootstrap that
-provides the interpreter and then pip-installs the package:
+The conda environment from `environment.yml` is a prefix env at `./envs`, so commands below are
+either run with that env active or prefixed with `./envs/bin/`.
 
 ```bash
-conda env create -f environment.yml -p ./envs
-./envs/bin/pip install -e ".[dev]"
+conda env create -f environment.yml -p ./envs   # creates ./envs and pip-installs -e ".[dev]"
+
+pytest                                          # whole suite (testpaths=tests)
+pytest tests/test_physics.py                    # one file
+pytest tests/test_cli_spectrum.py::TestRemoveFilter::test_removing_the_last_filter
+pytest -k hvl                                   # by name
+
+ruff check .                                    # CI gate
+ruff format --diff                              # CI runs this non-blocking
+
+xray-transmission -m Al -t 0.1 -e 30            # single energy
+xray-transmission -f -m Al "Cadmium Telluride" -t 0.1 -e 100   # filtered spectrum + plot
+xray-transmission-gui                           # desktop GUI
 ```
 
-Runtime deps: `polars>=1.0`, `numpy>=1.26`, `matplotlib>=3.8`. Dev extra: `pytest`, `ruff`.
-Requires Python >=3.11; the pinned dev interpreter is 3.12.2.
+The suite imports the *installed* package. Because of the `src/` layout there is no
+`__init__.py` in `tests/` and no path hackery, so `pip install -e .` is required before it runs.
 
-## Testing and Linting
+## Architecture
 
-```bash
-pytest          # testpaths=tests, configured in pyproject.toml
-ruff check .
-```
+Four layers, each depending only on the one below it:
 
-Tests import the *installed* package (`from xray_attenuation.data import Data`). Because of
-the `src/` layout there is deliberately no `__init__.py` in `tests/` and no path hackery —
-`pip install -e .` is required before the suite will run.
+| Layer | File | Responsibility |
+| --- | --- | --- |
+| GUI | `src/xray_attenuation/app.py` | imgui_bundle front end. Holds no physics: every action calls into `CLI` |
+| Orchestration + state | `src/xray_attenuation/cli.py` | `CLI` class owns `spectrum_df`, the filter stack and `max_kv`; also the argparse entry point |
+| Maths | `src/xray_attenuation/physics.py` | Pure NumPy functions, no I/O, no state |
+| Data | `src/xray_attenuation/data.py` | `Data` loads and looks up the NIST tables and the tungsten spectra (Polars) |
+
+`AppState.filters` is a *live property* over `cli.filters`, not a copy — `CLI.remove_filter`
+rebinds that list rather than mutating it, so it must not be cached. `CLI` is the single source
+of truth for the filter stack.
+
+### The spectrum DataFrame contract
+
+`CLI.spectrum_df` is the shared structure between `cli.py` and `app.py`. Its columns are, in order:
+
+1. `Energy[keV]`
+2. the unfiltered spectrum, named after the tube voltage as a bare integer string (`"60"`), which
+   is also `cli.max_kv`
+3. one column per filter, in stack order, named `f"{index}_{material}_{thickness}cm"` with
+   `index` starting at 1 (e.g. `2_Copper_0.1cm`)
+
+Column *order* is load-bearing: `get_total_filtered_fraction`, `get_mean_energy_spectrum`,
+`_aligned_arrays` and the GUI's `gui_plot` all index positionally (`columns[-1]` is the fully
+filtered spectrum, `columns[1:]` are the curves to draw). Anything that adds a column must append
+it at the end, or read by name.
+
+Filtering is **cumulative**: `add_filter` applies to the output of the previous filter, so each
+column holds the whole stack up to and including that filter, never that filter alone. Both front
+ends label curves with a `+ Material thickness` prefix to make the accumulation explicit.
+
+### Units
+
+- Everything from `CLI` down is **cm** — `Filter.thickness`, `add_filter`, `physics`.
+- The GUI displays and inputs **mm**, converting at the boundary (`* 1e-1` into `register_filter`,
+  `* 10` when rendering the stack). Keep the conversion at that boundary.
+- `physics.get_hvl` returns **mm**, the one deliberate exception.
+- Energies are keV throughout. In full-spectrum mode the tube voltage snaps to an integer kV
+  column via `np.round` (half-to-even: 60.5 -> 60, 61.5 -> 62) and `add_base_spectrum` prints a
+  NOTICE when it snaps.
+
+### Modules
+
+**`data.py`** — `Data()` loads everything on construction (expensive; share the instance).
+Elements come from three `.dat` files joined on `Energy` and stay lazy (`pl.scan_csv`), compounds
+stay lazy, spectra are collected eagerly. `resolve_material_name` maps a symbol, element name or
+compound name (any case) to `(canonical_name, is_compound)` or `None`;
+`get_linear_attenuation_curve` returns the two-column frame that `filter_spectrum` joins against.
+Both getters raise `MaterialNotFoundError` (a `KeyError`) for a material absent from the table.
+Data is resolved as `DATA_PATH = Path(__file__).parent / "data"` and is bundled into the wheel —
+never use a CWD-relative path.
+
+**`physics.py`** — stateless. `get_transmission` is `@overload`ed and works element-wise, so the
+same function serves a scalar mu and a whole attenuation curve. `get_hvl` bisects on thickness
+until half the integrated spectrum survives; `get_effective_energy` inverts that HVL back to an
+energy through the mu curve.
+
+**`cli.py`** — `matplotlib.pyplot` is imported *lazily*, inside `plot_spectra` and inside the
+full-spectrum branch of `main`. Keep it that way: a module-level import costs single-value runs
+~320 ms, and an import in `main` alone leaves `plot_spectra` with an undefined `plt`. The
+presentation style is applied through `plt.style.context(...)` so it cannot leak into the global
+rcParams of an importing process.
+
+**`app.py`** — hello_imgui docking layout with three windows: *Configuration* (`gui_commands`),
+*Beam quality* (`gui_info`) and *Plot* (`gui_plot`). The beam-quality panel and the plot's
+vertical markers are both driven by the `PhysicsQuantity` table built in `_make_physics_info`, so
+a new derived quantity is added there and nowhere else. Fonts and assets are resolved from
+`ASSETS_PATH` (package-relative) via `hello_imgui.set_assets_folder` *before* `immapp.run`,
+because hello_imgui otherwise looks them up relative to the CWD. `imgui-bundle>=1.92.801` is
+pinned for the dynamic-font API (`push_font(font, size)`, `get_font_baked`) and the ImPlot Spec
+API (`implot.Spec`, `item_icon`, `get_last_item_color`).
 
 ## Intentional Design Decisions
 
-These are deliberate. Do **not** report them as defects in a code review.
+Deliberate. Do **not** report these as defects in a review.
 
-**Filter stacking is cumulative.** Each `add_filter` applies to the output of the previous filter,
-so the column `N_Material_Xcm` holds the entire stack up to and including that filter, not that
-filter in isolation. Plot labels use a `+ Material X cm` prefix to make the accumulation explicit.
+- **Cumulative stacking and its column semantics** — see the DataFrame contract above.
+- **`CLI.remove_filter` recomputes every downstream filter.** That is the point of it, and it is
+  the GUI's remove button. The CLI is one-shot and never calls it; it is not dead code.
+- **Full-spectrum mode (`-f`) only prompts for the energy.** Material x thickness permutations
+  are too large to prompt through. Missing `-m`/`-t` warns and plots the unfiltered spectrum.
+- **`-m`/`-t` shape contract.** Equal-length lists are zipped into pairs; otherwise every material
+  is combined with every thickness. The intended shapes are 1xN and Nx1 — a true cross product
+  (3 materials x 2 thicknesses) is tolerated, not designed for.
+- **The spectrum/attenuation join drops rows.** `filter_spectrum` inner-joins the 1000-row
+  spectrum grid (0.1-100 keV) against the 1971-row NIST grid (3-200 keV), giving 971 rows.
+  Losing 0.1-2.9 keV is physically harmless: NIST starts at 3 keV and the tungsten spectrum is
+  negligible below it.
+- **`1e-35` is the "no data" sentinel.** Shorter spectra in `Spectra_9-100.csv` are padded with
+  it, and filtered values below it are clamped to 0 so they vanish from the log plots.
+- **Fixed y-limits** (`1e-10` to `1e-5` in both `plot_spectra` and `gui_plot`) are tuned, not
+  unconsidered constants.
+- **`get_linear_attenuation` requires an exact grid energy** and returns `None` otherwise. There
+  is no interpolation yet; that is a known gap, not a bug.
 
-**`remove_filter()` is unused by the CLI on purpose.** Because the stack is cumulative, removing a
-filter requires recomputing every filter after it — that is exactly what `remove_filter` does. It
-is the API the planned GUI layer will drive; the CLI is a one-shot tool and never needs it. Not
-dead code.
+## Tests
 
-**Full-spectrum mode (`-f`) is deliberately non-interactive.** It never prompts for material or
-thickness, because the space of material × thickness permutations is too large to prompt through
-for a tool this size. If `-m` or `-t` is missing it warns and plots the unfiltered spectrum.
-
-**`-m`/`-t` shape contract.** Equal-length lists are zipped into material/thickness pairs.
-Otherwise the intended shapes are one material with N thicknesses, or N materials with one
-thickness. Unequal lists that are neither (e.g. 3 materials × 2 thicknesses) fall into the nested
-loop and produce the full cross product — tolerated, not designed for.
-
-**The spectrum/attenuation join drops rows on purpose.** `filter_spectrum` inner-joins the 1000-row
-spectrum grid (0.1–100 keV) against the 1971-row attenuation grid (3–200 keV), yielding 971 rows.
-Losing 0.1–2.9 keV is expected and physically harmless: the tungsten spectrum is negligible there
-and the NIST tables do not start until 3 keV.
-
-**`ax.set_ylim(1e-10, 1e-5)` in `plot_spectra` is tuned deliberately.** Not an unconsidered
-hardcoded value.
-
-## Data Architecture
-
-### Data Files Structure
-
-All data lives at `src/xray_attenuation/data/` and is bundled into the wheel. Resolve it with
-`DATA_PATH = Path(__file__).parent / "data"` (see `data.py`) — never with a relative path or
-a CWD assumption.
-
-**Mass Attenuation Coefficients:**
-- `1-19.dat` - Elements 1-19 (H to K)
-- `20-69.dat` - Elements 20-69 (Ca to Tm)
-- `70-92.dat` - Elements 70-92 (Yb to U)
-- `compounds.dat` - NIST compound materials
-- All files are tab-separated with Energy column and material columns
-- Values are μ **already multiplied by density** (linear attenuation, cm⁻¹)
-
-**Material Information:**
-- `names_elements.txt` - Element metadata (Z, Symbol, Element name)
-- `names_compounds.txt` - Compound names
-
-**X-ray Spectra:**
-- `W-Spectra/` - Tungsten target X-ray spectra (9-100 kV)
-  - `data_*.txt` files: Simulated spectra (comma-separated, 3 columns: Energy, Data1, Data2)
-  - `Ip*.txt` files: Interpolated spectra (tab-separated, 4 columns for intermediate energies)
-  - `Spectra_9-100.csv` - Combined/organized spectra output (1000 rows × 93 columns)
-
-### Core Classes
-
-**`xray_attenuation.data.Data`** (src/xray_attenuation/data.py) — the current class:
-- Loads elements (3 joined `.dat` files), compounds and spectra on construction
-- Element/compound frames are lazy (`pl.scan_csv` → `LazyFrame`); spectra are eager
-- `resolve_material_name(name)` - symbol/name → `(canonical_name, is_compound)` or `None`
-- `get_linear_attenuation(material, energy, is_compound)` - μ [1/cm], or `None` if the exact
-  energy is not on the grid (log-log interpolation is the planned replacement)
-- `get_linear_attenuation_curve(material, is_compound)` - the whole μ curve as a two-column
-  `pl.DataFrame` ("Energy", material); this is what `cli.filter_spectrum` joins against
-- Both raise `MaterialNotFoundError` (a `KeyError` subclass) when the material is not a column of
-  the corresponding table
-
-**`XrayTransmission.Simulation`** (code/XrayTransmission.py) — legacy, not in the package:
-- Main simulation class that loads all databases
-- `load_data_bases()` - Loads and joins element/compound data using Polars
-- `get_spectrum(max_energy)` - Returns spectrum for given kV
-- `get_mass_attenuation(material_name, is_element)` - Returns μ/ρ data
-- `calculate_transmited_spectrum()` - Computes transmitted intensity using Beer-Lambert law
-
-**Data Processing Pipeline:**
-- Uses Polars DataFrames throughout (not Pandas)
-- Element data joined on "Energy" column with left joins
-- Spectra data has "Energy[keV]" column rounded to 1 decimal place
-- Transmission calculated as: I = I₀ × exp(-μ × thickness)
-
-## Code Organization
-
-**`src/xray_attenuation/cli.py`:** (current CLI)
-- argparse interface; `main()` is the `xray-transmission` console-script entry point
-- Delegates all lookup to `Data` and all Beer-Lambert maths to `physics`
-- `matplotlib.pyplot` is imported *lazily*, inside `plot_spectra` and inside the full-spectrum
-  branch of `main`, so single-value runs do not pay ~320 ms of pyplot import. Keep it that way —
-  a module-level import is a measurable regression, and a bare `import` inside `main` alone
-  leaves `plot_spectra` with an undefined `plt`
-- The presentation style is applied with `plt.style.context(...)` so it does not leak into the
-  global rcParams of anything else in the process
-
-**`src/xray_attenuation/physics.py`:**
-- `get_transmission(mu, thickness)` - pure Beer-Lambert, `exp(-mu * thickness)`. Works
-  element-wise on arrays as well as on scalars
-- `calculate_filtered_spectrum(spectrum, mu, thickness)` - `spectrum * get_transmission(...)`
-
-**`scripts/organize_spectra.py`:** (not installed; still imports `icecream`/`matplotlib`)
-- Processes raw W-Spectra files into unified CSV
-- Column mapping: Second number in filename determines column placement
-- Example: `data_10-15.txt` last column → Spectra_9-100.csv column 7
-- Handles padding for different length spectra (pads with 1e-35)
-- Special handling: Some Ip files have reversed column order (e0 in [15, 20, 25])
-
-**`code/app.py`:**
-- Streamlit interface with sidebar controls
-- Caches Simulation object with `@st.cache_resource`
-- Uses custom Plotly styling from `plotly_style.py`
-- Supports log/linear Y-axis switching
-- Filter by element or compound with adjustable thickness
-
-**`code/calculate_mass_attenuation.py`:** (legacy, superseded by `cli.py`)
-- Uses Windows-style paths (`\\` separators) and ignores its positional arguments
-
-## Key Implementation Details
-
-**Data Loading Pattern:**
-Element data is split across 3 files and joined:
-```python
-df = df_elements_0.join(df_elements_1, on="Energy", how="left")
-df = df.join(df_elements_2, on="Energy", how="left")
-```
-
-**Spectrum Processing:**
-- Energy values: 0.1 to 100.0 keV in 0.1 keV steps (1000 points)
-- Values below 1e-35 are sentinel values (no data)
-- Transmission values < 1e-35 are set to 0 for plotting
-
-**Column Indexing in organize_spectra.py:**
-- `i0` tracks position for `data_*.txt` files
-- `i1` tracks position for `Ip*.txt` files
-- Update indices after each file: `i0 += e1 - e0` or `i1 = idx1`
-- Interpolated files fill gaps between simulated energies
-
-## Important Notes
-
-- Energy range: 3-200 keV (enforced in `cli.py`); material thickness in cm
-- `get_linear_attenuation` requires an *exact* grid energy; off-grid values return `None`
-- In full-spectrum mode the tube voltage is snapped to the nearest available integer kV column;
-  `add_base_spectrum` prints a notice when it does. NumPy rounds half-to-even, so 60.5 → 60 but
-  61.5 → 62
-- Legacy-only issues, confined to `code/` and `scripts/`: `icecream` debug output, hardcoded
-  Windows paths, mixed path handling. The installed package uses none of these.
+`tests/conftest.py` pins matplotlib to Agg before the suite touches the lazy pyplot import, so
+plotting tests are headless. `test_cli_spectrum.py` builds one module-scoped `Data` and injects
+it by monkeypatching `xray_attenuation.cli.Data`, because construction dominates the runtime —
+follow that pattern rather than constructing `Data()` per test. `test_class_data.py` asserts
+exact frame shapes (1971x93 elements, 1000x93 spectra, ...), so editing anything under `data/`
+is expected to break it.

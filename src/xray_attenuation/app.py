@@ -13,6 +13,11 @@ from imgui_bundle import portable_file_dialogs as pfd
 
 from xray_attenuation import CLI, Filter
 
+# Resolved from the package, never from the CWD: hello_imgui looks assets up relative to
+# the working directory, and Roboto-SemiBold ships only here (imgui_bundle's own bundled
+# assets stop at Roboto-Regular/Bold/Italic)
+ASSETS_PATH = Path(__file__).parent / "assets"
+
 LOG_LEVEL = "DEBUG"
 
 logger = logging.getLogger(__name__)
@@ -472,8 +477,9 @@ def gui_plot(app_state: AppState) -> None:
             "Save file", str(directory), filters=["csv", "*.csv"]
         )
     if static.save_file_dialog is not None and static.save_file_dialog.ready():
-        app_state.save_file_name = Path(static.save_file_dialog.result())
-        app_state.save_csv_file()
+        if static.save_file_dialog.result() != "":
+            app_state.save_file_name = Path(static.save_file_dialog.result())
+            app_state.save_csv_file()
         static.save_file_dialog = None
 
     imgui.end_horizontal()
@@ -738,12 +744,15 @@ def main() -> None:
     add-on enabled. Blocks until the user closes the window.
     """
 
+    # Before immapp.run, because load_additional_fonts fires from inside it
+    hello_imgui.set_assets_folder(str(ASSETS_PATH))
+
     app_state = AppState()
 
     runner_params = hello_imgui.RunnerParams()
     runner_params.app_window_params.window_title = "X-ray Attenuation"
     runner_params.imgui_window_params.menu_app_title = "X-ray Attenuation"
-    runner_params.app_window_params.window_geometry.size = (1000, 900)
+    runner_params.app_window_params.window_geometry.size = (1010, 900)
     runner_params.app_window_params.restore_previous_geometry = False
     runner_params.app_window_params.borderless = False
     runner_params.app_window_params.borderless_movable = False
@@ -764,9 +773,9 @@ def main() -> None:
 
     runner_params.docking_params = create_default_layout(app_state)
 
-    # Use this for deployment
-    # runner_params.ini_folder_type = hello_imgui.IniFolderType.app_user_config_folder
-    runner_params.ini_folder_type = hello_imgui.IniFolderType.current_folder
+    # Not the current folder: the layout belongs to the user, not to whatever directory
+    # the app happened to be launched from
+    runner_params.ini_folder_type = hello_imgui.IniFolderType.app_user_config_folder
     runner_params.ini_filename = "xray_attenuation/xray_attenuation.ini"
 
     addons = immapp.AddOnsParams()

@@ -517,7 +517,14 @@ class CLI:
         return get_effective_energy(s0, bins, mu, hvl_mm)
 
     def save_spectrum(self, file_name: Path) -> bool:
+        """Saves the current spectrum DF as a csv file
 
+        Args:
+            file_name (Path): Path to file
+
+        Returns:
+            bool: If saving was successfull or not
+        """
         if self.spectrum_df is None:
             return False
 

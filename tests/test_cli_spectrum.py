@@ -6,8 +6,6 @@ import pytest
 from xray_attenuation.cli import CLI
 from xray_attenuation.data import Data
 
-# Energy to probe the spectra at. Well inside the 3-200 keV attenuation grid and far
-# enough above the 1e-35 sentinel that no clamping interferes with the comparisons.
 PROBE_KEV = 40.0
 TUBE_KV = 60
 
