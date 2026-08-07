@@ -227,6 +227,7 @@ class AppState:
         return answ
 
     def save_csv_file(self) -> None:
+        """Connection to CLI for saving the current plot as .csv"""
 
         if self.save_file_name.suffix == "":
             self.save_file_name = Path(str(self.save_file_name) + ".csv")

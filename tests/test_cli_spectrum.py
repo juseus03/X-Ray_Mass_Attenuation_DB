@@ -269,6 +269,25 @@ class TestPlotSpectra:
         assert len(written) == 1
         assert written[0].stat().st_size > 0
 
+    def test_save_spectrum(self, cli):
+
+        import tempfile
+        from pathlib import Path
+
+        base_path = Path(tempfile.gettempdir())
+
+        assert cli.save_spectrum(base_path) is False
+
+        build_stack(cli, [("Aluminum", 0.1), ("Lead", 0.2)])
+
+        assert cli.save_spectrum(base_path / "test.txt") is False
+        assert cli.save_spectrum(base_path / "test.csv") is True
+
+        data = pl.read_csv(base_path / "test.csv")
+
+        assert data.shape == (971, 4)
+        assert data.columns == ["Energy[keV]", "60", "1_Aluminum_0.1cm", "2_Lead_0.2cm"]
+
 
 class TestPhysicsMetrics:
     def test_total_filtered_franction(self, cli):
