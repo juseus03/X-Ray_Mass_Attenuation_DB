@@ -2,11 +2,14 @@
 
 import logging
 import re
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 from imgui_bundle import hello_imgui, imgui, immapp, implot
+from imgui_bundle import portable_file_dialogs as pfd
 
 from xray_attenuation import CLI, Filter
 
@@ -125,6 +128,8 @@ class AppState:
     small_body_font: imgui.ImFont = None
     big_body_font: imgui.ImFont = None
 
+    save_file_name: Path = Path(tempfile.gettempdir())
+
     @property
     def filters(self) -> list[Filter]:
         """The active filter stack, owned by the CLI layer
@@ -221,12 +226,27 @@ class AppState:
 
         return answ
 
+    def save_csv_file(self) -> None:
+
+        if self.save_file_name.suffix == "":
+            self.save_file_name = Path(str(self.save_file_name) + ".csv")
+
+        r = self.cli.save_spectrum(self.save_file_name)
+        if r:
+            logger.info("File saved in %s", self.save_file_name)
+        else:
+            logger.error("File can't be saved")
+
 
 # =============================================================================
 # GUI Functions
 # =============================================================================
 def load_fonts(app_state: AppState):
+    """Loads all the fonts to be used in the app
 
+    Args:
+        app_state (AppState):
+    """
     # First loaded font is set as default
     app_state.body_font = hello_imgui.load_font_ttf(
         "fonts/Roboto/Roboto-Regular.ttf", 20
@@ -243,6 +263,11 @@ def load_fonts(app_state: AppState):
 
 
 def push_font_with_default_size(font: imgui.ImFont):
+    """Handy method for easier font size management
+
+    Args:
+        font (imgui.ImFont): Loaded font
+    """
     imgui.push_font(font, font.legacy_size)
 
 
@@ -401,6 +426,7 @@ def gui_commands(app_state: AppState) -> None:
     imgui.text_wrapped(app_state.get_total_filter_stack())
 
 
+@immapp.static(save_file_dialog=None, base_energy=None, ylimits=[1e-10, 1e-5])
 def gui_plot(app_state: AppState) -> None:
     """Renders the "Plot" panel
 
@@ -411,25 +437,46 @@ def gui_plot(app_state: AppState) -> None:
     """
     static = gui_plot
 
-    if not hasattr(static, "base_energy"):
+    if static.base_energy is None:
         static.base_energy = app_state.get_current_base_spectrum()
 
-    if not hasattr(static, "ylimits"):
-        static.ylimits = [1e-10, 1e-5]
-
     ## Plot checkboxes
+    avail = imgui.get_content_region_avail()
+    widget_w = int(avail.x / 3)
+
+    imgui.push_style_var(
+        imgui.StyleVar_.item_spacing, imgui.ImVec2(widget_w * 0.57, int(avail.y) * 0.01)
+    )
+
+    imgui.begin_horizontal("", imgui.ImVec2(widget_w * 3, 0))
+
     current_info = app_state.physics_info["mean_energy"]
     _, current_info.show_in_plot = imgui.checkbox(
         current_info.name, current_info.show_in_plot
     )
-    imgui.same_line()
-    imgui.indent(immapp.em_to_vec2(10, 0).x)
 
     current_info = app_state.physics_info["eeff"]
     _, current_info.show_in_plot = imgui.checkbox(
         current_info.name, current_info.show_in_plot
     )
-    imgui.unindent(immapp.em_to_vec2(10, 0).x)
+
+    # Save spectrum btn
+    if imgui.button("Download"):
+        directory = (
+            app_state.save_file_name
+            if app_state.save_file_name.is_dir()
+            else app_state.save_file_name.parent
+        )
+        static.save_file_dialog = pfd.save_file(
+            "Save file", str(directory), filters=["csv", "*.csv"]
+        )
+    if static.save_file_dialog is not None and static.save_file_dialog.ready():
+        app_state.save_file_name = Path(static.save_file_dialog.result())
+        app_state.save_csv_file()
+        static.save_file_dialog = None
+
+    imgui.end_horizontal()
+    imgui.pop_style_var()
 
     ## Spectra plot
     push_font_with_default_size(app_state.small_body_font)

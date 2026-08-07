@@ -516,6 +516,17 @@ class CLI:
             return None
         return get_effective_energy(s0, bins, mu, hvl_mm)
 
+    def save_spectrum(self, file_name: Path) -> bool:
+
+        if self.spectrum_df is None:
+            return False
+
+        if file_name.suffix not in [".csv"]:
+            return False
+
+        self.spectrum_df.write_csv(file_name, float_scientific=True, separator=",")
+        return True
+
 
 def _get_user_energy(cli: CLI, args: argparse.Namespace) -> float:
     """Interactive mode for getting the energy value from the user
