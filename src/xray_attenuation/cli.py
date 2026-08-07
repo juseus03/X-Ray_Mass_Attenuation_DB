@@ -8,9 +8,17 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
+from numpy.typing import NDArray
 
 from xray_attenuation.data import Data
-from xray_attenuation.physics import calculate_filtered_spectrum, get_transmission
+from xray_attenuation.physics import (
+    calculate_filtered_spectrum,
+    calculate_total_filtered_fraction,
+    get_effective_energy,
+    get_hvl,
+    get_mean_energy_spectrum,
+    get_transmission,
+)
 
 DATA_PATH = Path(__file__).parent / "data"
 TMP_PATH = Path(tempfile.gettempdir())
@@ -268,7 +276,7 @@ class CLI:
             pl.when(filtered_spectrum < 1e-35)
             .then(0)
             .otherwise(filtered_spectrum)
-            .alias(f"{len(self.filters)+1}_{pfilter.name}_{pfilter.thickness}cm")
+            .alias(f"{len(self.filters) + 1}_{pfilter.name}_{pfilter.thickness}cm")
         ).drop(pfilter.name)
 
     def remove_filter(self, filter_index: int) -> None:
@@ -304,6 +312,11 @@ class CLI:
         Args:
             energy (float): Maximum value of the energy spectrum in keV
         """
+
+        # Should clean the filters list the same way as it redoes the
+        # data frame
+        self.filters = []
+
         energy_column_name = str(int(np.round(energy, 0)))
 
         # Spectra exist only at integer kV, so anything else is snapped. np.round is
@@ -380,6 +393,147 @@ class CLI:
                 else:
                     print(f"Plot saved to: {path}")
 
+    def get_single_material_name(self, material_name: str) -> tuple[str, bool] | None:
+        """Interactive mode for getting the material name from the user
+
+        Args:
+            material_name (str): given material name from the user
+
+        Returns:
+            tuple[str, bool] | None: (canonical name, is_compound)
+            if the material is in the database, otherwise None
+        """
+        if material_name is None or material_name == "-":
+            name = self.ask_for_materials()
+        else:
+            name = material_name
+
+        return self.data.resolve_material_name(name)
+
+    def get_total_filtered_fraction(self) -> float | None:
+        """Returns the total filtered fraction of the last added spectrum
+        against the unfiltered spectrum
+
+        Returns:
+            float | None: Fractional value
+        """
+        if self.spectrum_df is None:
+            return None
+
+        if self.spectrum_df.shape[1] < 3:
+            return None
+
+        columns = self.spectrum_df.columns
+
+        s0 = self.spectrum_df[self.max_kv].to_numpy().flatten()
+        s1 = self.spectrum_df[columns[-1]].to_numpy().flatten()
+
+        return calculate_total_filtered_fraction(s0, s1)
+
+    def get_mean_energy_spectrum(self) -> float | None:
+        """Get mean energy of last spectrum
+
+        Returns:
+            float | None: Mean energy in keV
+        """
+        if self.spectrum_df is None:
+            return None
+
+        columns = self.spectrum_df.columns
+        bins = self.spectrum_df[columns[0]].to_numpy().flatten()
+        s0 = self.spectrum_df[columns[-1]].to_numpy().flatten()
+
+        return get_mean_energy_spectrum(s0, bins)
+
+    def _aligned_arrays(
+        self, material: str
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]] | None:
+        """(bins, spectrum, mu) for `material`, all on the same joined energy grid."""
+        if self.spectrum_df is None:
+            return None
+
+        resolved = self.get_single_material_name(material)
+        if resolved is None:
+            print(f"ERROR: {material} not in the DB")
+            return None
+        mname, is_compound = resolved
+
+        mu_curve = self.data.get_linear_attenuation_curve(mname, is_compound)
+        df = self.spectrum_df.join(
+            mu_curve, left_on="Energy[keV]", right_on="Energy", validate="1:1"
+        )
+        cols = df.columns
+
+        return (
+            df["Energy[keV]"].to_numpy(),
+            df[cols[-2]].to_numpy(),
+            df[mname].to_numpy(),
+        )
+
+    def get_hvl(self, material: str = "Aluminum") -> float | None:
+        """Returns the HVL in "material" of the last added spectrum
+
+        Args:
+            material (str, optional): Material for HVL calculation.
+            Defaults to "Aluminum".
+
+        Returns:
+            float | None: HVL in mm
+        """
+        try:
+            arrays = self._aligned_arrays(material)
+            if arrays is None:
+                return None
+            _, s0, mu = arrays
+            return get_hvl(s0, mu)
+
+        except ValueError:
+            print(f"ERROR: linear attenuation of {material} is always zero")
+            return None
+
+    def get_effective_energy(self, material: str = "Aluminum") -> float | None:
+        """Returns the effective nergy of the last added spectrum
+
+        Args:
+            material (str, optional): Material for HVL calculation.
+            Defaults to "Aluminum".
+
+        Returns:
+            float | None: Effective energy in keV
+        """
+
+        arrays = self._aligned_arrays(material)
+        if arrays is None:
+            return None
+        bins, s0, mu = arrays
+
+        try:
+            hvl_mm = get_hvl(s0, mu)
+            if not hvl_mm:
+                return None
+        except ValueError:
+            print(f"ERROR: linear attenuation of {material} is always zero")
+            return None
+        return get_effective_energy(s0, bins, mu, hvl_mm)
+
+    def save_spectrum(self, file_name: Path) -> bool:
+        """Saves the current spectrum DF as a csv file
+
+        Args:
+            file_name (Path): Path to file
+
+        Returns:
+            bool: If saving was successfull or not
+        """
+        if self.spectrum_df is None:
+            return False
+
+        if file_name.suffix not in [".csv"]:
+            return False
+
+        self.spectrum_df.write_csv(file_name, float_scientific=True, separator=",")
+        return True
+
 
 def _get_user_energy(cli: CLI, args: argparse.Namespace) -> float:
     """Interactive mode for getting the energy value from the user
@@ -400,25 +554,6 @@ def _get_user_energy(cli: CLI, args: argparse.Namespace) -> float:
         f"({cli.min_energy:.0f} keV - {cli.max_energy:.0f} keV)"
     )
     return cli.get_user_input("energy")
-
-
-def _get_single_material_name(cli: CLI, material_name: str) -> tuple[str, bool] | None:
-    """Interactive mode for getting the material name from the user
-
-    Args:
-        cli (CLI): cli object
-        material_name (str): given material name from the user
-
-    Returns:
-        tuple[str, bool] | None: (canonical name, is_compound) if the material is in the
-            database, otherwise None
-    """
-    if material_name is None or material_name == "-":
-        name = cli.ask_for_materials()
-    else:
-        name = material_name
-
-    return cli.data.resolve_material_name(name)
 
 
 def run_single_value(cli: CLI, args: argparse.Namespace) -> None:
@@ -506,7 +641,7 @@ def main() -> None:
 
     if len(args.material_name) == len(args.thickness):
         for m, t in zip(args.material_name, args.thickness, strict=True):
-            resolved = _get_single_material_name(cli, m)
+            resolved = cli.get_single_material_name(m)
             if resolved is None:
                 sys.stderr.write(f"Error: '{m}' is not in the database\n")
                 sys.exit(1)
@@ -515,7 +650,7 @@ def main() -> None:
     else:
         # Map n->m:
         for m in args.material_name:
-            resolved = _get_single_material_name(cli, m)
+            resolved = cli.get_single_material_name(m)
             if resolved is None:
                 sys.stderr.write(f"Error: '{m}' is not in the database\n")
                 sys.exit(1)

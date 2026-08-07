@@ -14,7 +14,13 @@
       "Bash(./envs/bin/python -c ' *)",
       "Bash(MPLBACKEND=Agg ./envs/bin/python -c ' *)",
       "Bash(./envs/bin/python -m pytest -q)",
-      "Bash(gh run *)"
+      "Bash(gh run *)",
+      "Bash(./envs/bin/python -)",
+      "Bash(ldd ./envs/lib/python3.12/site-packages/imgui_bundle/_imgui_bundle*.so)",
+      "Bash(./envs/bin/python /tmp/probe_align.py)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
     ]
   }
 }

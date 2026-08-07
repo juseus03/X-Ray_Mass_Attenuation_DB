@@ -136,3 +136,27 @@ class Data:
             return None
 
         return mu[material][0]
+
+    def get_spectrum_list(self) -> list[str]:
+        return self.df_spectra.columns[1:]
+
+    def get_materials_list(self) -> list[str]:
+
+        elements_name = self.df_elements_names["Element"]
+        elements_symbol = self.df_elements_names["Symbol"]
+
+        materials = [
+            f"{n} ({s})" for n, s in zip(elements_name, elements_symbol, strict=True)
+        ]
+
+        compound_names = self.df_compounds_names["Material"].to_list()
+        materials += compound_names
+        return materials
+
+    def get_material_symbol(self, material: str) -> str:
+
+        series = self.df_elements_names.filter(pl.col("Element") == material)["Symbol"]
+        if series.shape[0] > 0:
+            return series[0]
+        else:
+            return ""

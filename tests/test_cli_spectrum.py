@@ -6,8 +6,6 @@ import pytest
 from xray_attenuation.cli import CLI
 from xray_attenuation.data import Data
 
-# Energy to probe the spectra at. Well inside the 3-200 keV attenuation grid and far
-# enough above the 1e-35 sentinel that no clamping interferes with the comparisons.
 PROBE_KEV = 40.0
 TUBE_KV = 60
 
@@ -38,7 +36,6 @@ def value_at(cli, column, energy=PROBE_KEV):
 
 
 class TestAddBaseSpectrum:
-
     def test_selects_the_requested_tube_voltage(self, cli):
         cli.add_base_spectrum(TUBE_KV)
 
@@ -69,7 +66,6 @@ class TestAddBaseSpectrum:
 
 
 class TestAddFilter:
-
     def test_single_filter_follows_beer_lambert(self, cli, shared_data):
         cli.add_base_spectrum(TUBE_KV)
         base = value_at(cli, "60")
@@ -162,7 +158,6 @@ def build_stack(cli, materials):
 
 
 class TestRemoveFilter:
-
     STACK = [("Aluminum", 0.1), ("Copper", 0.1), ("Iron", 0.1)]
 
     def test_removing_the_last_filter(self, cli):
@@ -216,7 +211,6 @@ class TestRemoveFilter:
 
 
 class TestPlotSpectra:
-
     def test_plots_one_line_per_spectrum_with_cumulative_labels(self, cli):
         build_stack(cli, [("Aluminum", 0.1), ("Copper", 0.2)])
 
@@ -272,3 +266,99 @@ class TestPlotSpectra:
         written = list(tmp_path.glob("*.png"))
         assert len(written) == 1
         assert written[0].stat().st_size > 0
+
+    def test_save_spectrum(self, cli):
+
+        import tempfile
+        from pathlib import Path
+
+        base_path = Path(tempfile.gettempdir())
+
+        assert cli.save_spectrum(base_path) is False
+
+        build_stack(cli, [("Aluminum", 0.1), ("Lead", 0.2)])
+
+        assert cli.save_spectrum(base_path / "test.txt") is False
+        assert cli.save_spectrum(base_path / "test.csv") is True
+
+        data = pl.read_csv(base_path / "test.csv")
+
+        assert data.shape == (971, 4)
+        assert data.columns == ["Energy[keV]", "60", "1_Aluminum_0.1cm", "2_Lead_0.2cm"]
+
+
+class TestPhysicsMetrics:
+    def test_total_filtered_franction(self, cli):
+
+        assert cli.get_total_filtered_fraction() is None
+
+        cli.add_base_spectrum(TUBE_KV)
+
+        cli.spectrum_df = cli.spectrum_df.with_columns(
+            (pl.col(str(TUBE_KV)) * 0.5).alias("frac")
+        )
+        assert cli.get_total_filtered_fraction() == pytest.approx(0.5, abs=1e-5)
+
+        cli.spectrum_df = cli.spectrum_df.with_columns(
+            (pl.col(str(TUBE_KV)) * 0.1).alias("frac")
+        )
+        assert cli.get_total_filtered_fraction() == pytest.approx(0.1, abs=1e-5)
+
+        cli.spectrum_df = cli.spectrum_df.with_columns(
+            (pl.col(str(TUBE_KV)) * 0.8).alias("frac")
+        )
+        assert cli.get_total_filtered_fraction() == pytest.approx(0.8, abs=1e-5)
+
+        cli.spectrum_df = cli.spectrum_df.with_columns(
+            (pl.col(str(TUBE_KV)) * 0.8).alias("frac")
+        )
+        assert cli.get_total_filtered_fraction() == pytest.approx(0.8, abs=1e-5)
+
+        with pytest.raises(ValueError):
+            cli.spectrum_df = cli.spectrum_df.with_columns(
+                (pl.col(str(TUBE_KV)) * 1.8).alias("frac")
+            )
+            cli.get_total_filtered_fraction()
+
+    def test_mean_energy_spectrum(self, cli):
+
+        assert cli.get_mean_energy_spectrum() is None
+
+        voltages = [50, 60, 70, 80, 90, 100]
+        answ = []
+
+        for v in voltages:
+            cli.add_base_spectrum(v)
+            answ.append(cli.get_mean_energy_spectrum())
+
+        assert all(f > 0 for f in answ)
+        assert all(v > f for f, v in zip(answ, voltages, strict=True))
+        assert answ == sorted(answ)
+
+    def test_get_hvl(self, cli):
+        assert cli.get_hvl() is None
+
+        cli.add_base_spectrum(TUBE_KV)
+        hvl = cli.get_hvl()
+
+        cli.add_filter("Aluminum", TUBE_KV, hvl * 1e-1, False)
+        frac = cli.get_total_filtered_fraction()
+
+        assert frac == pytest.approx(0.5, abs=1e-4)
+
+    def test_get_effective_energy(self, cli):
+
+        assert cli.get_effective_energy() is None
+
+        cli.add_base_spectrum(TUBE_KV)
+        answ = []
+
+        answ.append(cli.get_effective_energy())
+
+        cli.add_filter("Aluminum", TUBE_KV, 0.1, False)
+        answ.append(cli.get_effective_energy())
+
+        cli.add_filter("Aluminum", TUBE_KV, 0.1, False)
+        answ.append(cli.get_effective_energy())
+
+        assert answ == sorted(answ)

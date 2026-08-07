@@ -24,6 +24,9 @@ dependencies = [
     "polars>=1.0",
     "numpy>=1.26",
     "matplotlib>=3.8",
+    # app.py needs the dynamic-font imgui API (push_font(font, size), get_font_baked)
+    # and the ImPlot Spec API (implot.Spec, item_icon, get_last_item_color)
+    "imgui-bundle>=1.92.801",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +34,7 @@ dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
 xray-transmission = "xray_attenuation.cli:main"
+xray-transmission-gui = "xray_attenuation.app:main"
 
 [project.urls]
 Homepage = "https://github.com/juseus03/X-Ray_Mass_Attenuation_DB"
@@ -44,9 +48,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 88
-src = ["src", "tests", "scripts"]
-# Pre-restructure copy of the code, superseded by src/xray_attenuation/.
-extend-exclude = ["code"]
+src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
