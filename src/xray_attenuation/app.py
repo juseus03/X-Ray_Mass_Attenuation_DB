@@ -117,7 +117,13 @@ class AppState:
 
     physics_info: dict[str, PhysicsQuantity] = field(default_factory=_make_physics_info)
 
+    spectrum_color: imgui.ImVec4 = imgui.ImVec4(1, 1, 1, 1.000000)
     curve_colors: list[imgui.ImVec4] = field(default_factory=list)
+
+    body_font: imgui.ImFont = None
+    headings_font: imgui.ImFont = None
+    small_body_font: imgui.ImFont = None
+    big_body_font: imgui.ImFont = None
 
     @property
     def filters(self) -> list[Filter]:
@@ -219,6 +225,37 @@ class AppState:
 # =============================================================================
 # GUI Functions
 # =============================================================================
+def load_fonts(app_state: AppState):
+
+    # First loaded font is set as default
+    app_state.body_font = hello_imgui.load_font_ttf(
+        "fonts/Roboto/Roboto-Regular.ttf", 20
+    )
+    app_state.small_body_font = hello_imgui.load_font_ttf(
+        "fonts/Roboto/Roboto-Regular.ttf", 17
+    )
+    app_state.big_body_font = hello_imgui.load_font_ttf(
+        "fonts/Roboto/Roboto-Regular.ttf", 24
+    )
+    app_state.headings_font = hello_imgui.load_font_ttf(
+        "fonts/Roboto/Roboto-SemiBold.ttf", 20
+    )
+
+
+def push_font_with_default_size(font: imgui.ImFont):
+    imgui.push_font(font, font.legacy_size)
+
+
+def font_ascent(font: imgui.ImFont) -> float:
+    """Distance from the top of a line of text down to its baseline, in pixels
+
+    Args:
+        font (imgui.ImFont): font to measure, at its default size
+
+    Returns:
+        float: the ascent in pixels
+    """
+    return font.get_font_baked(font.legacy_size).ascent
 
 
 def gui_commands(app_state: AppState) -> None:
@@ -239,7 +276,9 @@ def gui_commands(app_state: AppState) -> None:
     if not hasattr(static, "thickness"):
         static.thickness = 0.1
 
+    push_font_with_default_size(app_state.headings_font)
     imgui.separator_text("Source")
+    imgui.pop_font()
 
     imgui.text("Tube voltage")
     txt_size = imgui.get_item_rect_size().x + 10
@@ -256,10 +295,15 @@ def gui_commands(app_state: AppState) -> None:
     )
 
     imgui.indent(txt_size)
+    push_font_with_default_size(app_state.small_body_font)
     imgui.text_disabled("W-anode, 150 um Be window")
+    imgui.pop_font()
     imgui.unindent(txt_size)
 
+    push_font_with_default_size(app_state.headings_font)
     imgui.separator_text("Add filter")
+    imgui.pop_font()
+
     materials = app_state.material_list
 
     avail_w = imgui.get_content_region_avail().x
@@ -306,7 +350,9 @@ def gui_commands(app_state: AppState) -> None:
 
     imgui.unindent(widget_w)
 
+    push_font_with_default_size(app_state.headings_font)
     imgui.separator_text("Filter stack")
+    imgui.pop_font()
 
     # Table layout for better organization and indent
 
@@ -321,7 +367,10 @@ def gui_commands(app_state: AppState) -> None:
         imgui.table_setup_column(
             "Thickness", imgui.TableColumnFlags_.width_fixed, width * 0.2
         )
+        push_font_with_default_size(app_state.small_body_font)
         imgui.table_headers_row()
+        imgui.pop_font()
+
         for i, f in enumerate(app_state.filters):
             imgui.push_id(i)
             imgui.table_next_row()
@@ -383,6 +432,7 @@ def gui_plot(app_state: AppState) -> None:
     imgui.unindent(immapp.em_to_vec2(10, 0).x)
 
     ## Spectra plot
+    push_font_with_default_size(app_state.small_body_font)
 
     yflags = implot.AxisFlags_.lock_max | implot.AxisFlags_.lock_min
 
@@ -397,8 +447,6 @@ def gui_plot(app_state: AppState) -> None:
 
     intensity_cols = app_state.cli.spectrum_df.columns[1:]
 
-    # One label per column: the base spectrum, then the cumulative filters. strict
-    # asserts that correspondence rather than letting a curve be mislabelled
     labels = [f"{app_state.cli.max_kv} kV"]
     labels += [f"+ {f.name} {f.thickness * 10:.3f} mm" for f in app_state.filters]
 
@@ -416,8 +464,17 @@ def gui_plot(app_state: AppState) -> None:
             intensity = app_state.cli.spectrum_df[c].to_numpy().flatten()
 
             imgui.push_id(i)
-            implot.plot_line(lbl, energy, intensity, spec=implot.Spec(line_weight=3))
-            # plot_shaded reuses this item's id, so this is the color of both
+            color = None
+            if i == 0:
+                color = app_state.spectrum_color
+
+            implot.plot_line(
+                lbl,
+                energy,
+                intensity,
+                spec=implot.Spec(line_weight=3, line_color=color),
+            )
+
             curve_colors.append(implot.get_last_item_color())
             implot.plot_shaded(lbl, energy, intensity, spec=spec_fill)
             imgui.pop_id()
@@ -426,8 +483,6 @@ def gui_plot(app_state: AppState) -> None:
 
         ylims = implot.get_plot_limits().y
         log_min, log_max = np.log10(ylims.min), np.log10(ylims.max)
-        # 90% of the visible height. The axis is log-scaled, so the fraction is taken
-        # in log space rather than as 0.9 * ymax
         y_annotation = 10 ** (log_min + 0.93 * (log_max - log_min))
         line_height = imgui.get_text_line_height_with_spacing()
 
@@ -454,8 +509,12 @@ def gui_plot(app_state: AppState) -> None:
 
         implot.end_plot()
 
+    imgui.pop_font()
 
-def _gui_quantity_cell(quantity: PhysicsQuantity, value_width: float) -> None:
+
+def _gui_quantity_cell(
+    quantity: PhysicsQuantity, value_width: float, app_state: AppState
+) -> None:
     """Renders one quantity inside the current table cell
 
     Lays out ``name`` flush left, then the unit and the value flush right. The value
@@ -467,21 +526,36 @@ def _gui_quantity_cell(quantity: PhysicsQuantity, value_width: float) -> None:
     """
     right = imgui.get_cursor_pos_x() + imgui.get_content_region_avail().x
     spacing = imgui.get_style().item_spacing.x
+    top = imgui.get_cursor_pos_y()
 
-    imgui.text_unformatted(quantity.name)
+    # The unit is set in a smaller font than the name and the value, so it has to be
+    # pushed down onto their baseline instead of being top-aligned with them
+    unit_baseline = font_ascent(app_state.big_body_font) - font_ascent(
+        app_state.small_body_font
+    )
+
+    push_font_with_default_size(app_state.big_body_font)
+    imgui.text(quantity.name)
+    imgui.pop_font()
 
     imgui.same_line()
+
+    push_font_with_default_size(app_state.small_body_font)
+
     unit_width = imgui.calc_text_size(quantity.unit).x
     imgui.set_cursor_pos_x(right - value_width - spacing - unit_width)
-    imgui.push_style_color(
-        imgui.Col_.text, imgui.get_style_color_vec4(imgui.Col_.text_disabled)
-    )
-    imgui.text_unformatted(quantity.unit)
-    imgui.pop_style_color()
+    imgui.set_cursor_pos_y(top + unit_baseline)
+
+    imgui.text_disabled(quantity.unit)
+    imgui.pop_font()
 
     imgui.same_line()
-    imgui.set_cursor_pos_x(right - imgui.calc_text_size(quantity.text).x)
-    imgui.text_unformatted(quantity.text)
+
+    imgui.set_cursor_pos_x(right - imgui.calc_text_size(quantity.text).x * 1.1)
+
+    push_font_with_default_size(app_state.big_body_font)
+    imgui.text(quantity.text)
+    imgui.pop_font()
 
 
 def gui_info(app_state: AppState) -> None:
@@ -502,7 +576,7 @@ def gui_info(app_state: AppState) -> None:
             imgui.table_next_row()
             for quantity in quantities[row : row + 2]:
                 imgui.table_next_column()
-                _gui_quantity_cell(quantity, value_width)
+                _gui_quantity_cell(quantity, value_width, app_state)
         imgui.end_table()
     imgui.pop_style_var()
 
@@ -538,7 +612,7 @@ def create_default_docking_splits() -> list[hello_imgui.DockingSplit]:
     split_main_misc.initial_dock = "MainDockSpace"
     split_main_misc.new_dock = "OtherInfoSPace"
     split_main_misc.direction = imgui.Dir.down
-    split_main_misc.ratio = 0.25
+    split_main_misc.ratio = 0.16
 
     # Add a space to the left which occupies a column whose width
     # is 30% of the app width
@@ -546,7 +620,7 @@ def create_default_docking_splits() -> list[hello_imgui.DockingSplit]:
     split_main_command.initial_dock = "MainDockSpace"
     split_main_command.new_dock = "CommandSpace"
     split_main_command.direction = imgui.Dir.left
-    split_main_command.ratio = 0.30
+    split_main_command.ratio = 0.4
 
     splits = [split_main_misc, split_main_command]
     return splits
@@ -600,11 +674,9 @@ def create_default_layout(app_state: AppState) -> hello_imgui.DockingParams:
 
     Returns:
         hello_imgui.DockingParams: the layout, named "Default". It is only applied
-            the first time the app runs; afterwards the saved .ini file wins
+            the first time the app runs; afterwards the saved .ini file is loaded
     """
     docking_params = hello_imgui.DockingParams()
-    # By default, the layout name is already "Default"
-    # docking_params.layout_name = "Default"
     docking_params.docking_splits = create_default_docking_splits()
     docking_params.dockable_windows = create_dockable_windows(app_state)
     return docking_params
@@ -630,22 +702,25 @@ def main() -> None:
     runner_params.app_window_params.borderless_resizable = False
     runner_params.app_window_params.borderless_closable = False
 
-    # runner_params.docking_params.layout_condition = (
-    #     hello_imgui.DockingLayoutCondition.application_start
-    # )
+    runner_params.imgui_window_params.enable_viewports = False
+    runner_params.imgui_window_params.show_menu_bar = True
+
+    runner_params.callbacks.load_additional_fonts = lambda: load_fonts(app_state)
+    runner_params.docking_params.layout_condition = (
+        hello_imgui.DockingLayoutCondition.application_start
+    )
 
     runner_params.imgui_window_params.default_imgui_window_type = (
         hello_imgui.DefaultImGuiWindowType.provide_full_screen_dock_space
     )
 
-    runner_params.imgui_window_params.enable_viewports = False
     runner_params.docking_params = create_default_layout(app_state)
+
     # Use this for deployment
     # runner_params.ini_folder_type = hello_imgui.IniFolderType.app_user_config_folder
     runner_params.ini_folder_type = hello_imgui.IniFolderType.current_folder
     runner_params.ini_filename = "xray_attenuation/xray_attenuation.ini"
 
-    # hello_imgui.run(runner_params)
     addons = immapp.AddOnsParams()
     addons.with_implot = True
     immapp.run(runner_params, addons)
