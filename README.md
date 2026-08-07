@@ -1,6 +1,7 @@
 # X-Ray Attenuation
 [![Tests](https://img.shields.io/github/actions/workflow/status/juseus03/X-Ray_Mass_Attenuation_DB/python-package-conda.yml?branch=main&label=Tests)](https://github.com/juseus03/X-Ray_Mass_Attenuation_DB/actions/workflows/python-package-conda.yml)
- 
+ [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 Software for computing photon transmission through matter, based on the NIST tables of X-ray mass attenuation coefficients [1].
  
 The calculation is the Beer-Lambert law: the intensity $I$ of photons after traversing a thickness $t$ of material is
@@ -12,6 +13,7 @@ where $I_0$ is the incident intensity and $\mu$ the linear attenuation coefficie
 The software answers two questions:
 1. What percentage of photons survives x cm of a material?
 2. How much of a 9 kV - 100 kV tungsten spectrum survives x cm of a material?
+
 ## Installation
  
 Requires Python >= 3.11. With conda and the `environment.yml`:
