@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Computes photon transmission through matter (Beer-Lambert, `I = I0 * exp(-mu * t)`) from the NIST
 X-ray mass attenuation tables. It ships two front ends over one calculation core: an `argparse`
-CLI (`xray-transmission`) and a Dear ImGui / hello_imgui desktop GUI (`xray-transmission-gui`).
+CLI (`xray-attenuation`) and a Dear ImGui / hello_imgui desktop GUI (`xray-attenuation-gui`).
 
 ## Commands
 
@@ -24,9 +24,9 @@ pytest -k hvl                                   # by name
 ruff check .                                    # CI gate
 ruff format --diff                              # CI runs this non-blocking
 
-xray-transmission -m Al -t 0.1 -e 30            # single energy
-xray-transmission -f -m Al "Cadmium Telluride" -t 0.1 -e 100   # filtered spectrum + plot
-xray-transmission-gui                           # desktop GUI
+xray-attenuation -m Al -t 0.1 -e 30             # single energy
+xray-attenuation -f -m Al "Cadmium Telluride" -t 0.1 -e 100   # filtered spectrum + plot
+xray-attenuation-gui                            # desktop GUI
 ```
 
 The suite imports the *installed* package. Because of the `src/` layout there is no

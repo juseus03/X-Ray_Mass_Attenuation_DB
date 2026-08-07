@@ -33,8 +33,8 @@ dependencies = [
 dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
-xray-transmission = "xray_attenuation.cli:main"
-xray-transmission-gui = "xray_attenuation.app:main"
+xray-attenuation = "xray_attenuation.cli:main"
+xray-attenuation-gui = "xray_attenuation.app:main"
 
 [project.urls]
 Homepage = "https://github.com/juseus03/X-Ray_Mass_Attenuation_DB"
