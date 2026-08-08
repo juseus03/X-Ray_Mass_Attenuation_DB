@@ -157,3 +157,7 @@ poetry.lock
 # Dear ImGui / hello_imgui runtime layout files
 imgui.ini
 xray_attenuation.ini
+
+.claude/
+.vscode/
+CLAUDE.md
